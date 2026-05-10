@@ -201,6 +201,36 @@ export async function updateProgramTarget(id, target_value, target_unit, target_
   if(error){ console.error('updateProgramTarget:', error); throw error; }
 }
 
+// Seed exercise_program_selections from gym_program template for a quarter.
+// Returns array of inserted rows (matched library entries only). Skips name-mismatches.
+export async function seedSelectionsFromGymProgram(userId, quarterId, gymProgramRows, exerciseLibrary){
+  if(!userId || !gymProgramRows?.length) return { inserted: [], unmatched: [] };
+  const unmatched = [];
+  const rows = gymProgramRows.map((g, i) => {
+    const name = (g.exercise || '').trim().toLowerCase();
+    const lib = (exerciseLibrary || []).find(e => e.name.trim().toLowerCase() === name);
+    if(!lib){ unmatched.push(g.exercise); return null; }
+    return {
+      user_id: userId,
+      quarter_id: quarterId,
+      exercise_slug: lib.slug,
+      target_value: g.target_reps || null,
+      target_unit: g.target_reps ? 'reps' : null,
+      target_note: [g.target_sets && `${g.target_sets}×${g.target_reps||'?'}`, g.target_rpe && `RPE ${g.target_rpe}`].filter(Boolean).join(' @ ') || null,
+      sort_order: g.sort_order ?? i,
+    };
+  }).filter(Boolean);
+  if(!rows.length) return { inserted: [], unmatched };
+  const { data, error } = await supa.from('exercise_program_selections')
+    .upsert(rows, { onConflict: 'user_id,quarter_id,exercise_slug', ignoreDuplicates: true })
+    .select();
+  if(error && error.code !== '23505'){
+    console.error('seedSelectionsFromGymProgram:', error);
+    throw error;
+  }
+  return { inserted: data || [], unmatched };
+}
+
 // ── BODY COMP LOG ──
 export async function loadBodyComp(userId, quarterId){
   const { data } = await supa.from('body_comp_log')

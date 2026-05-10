@@ -24,6 +24,10 @@ export const S = {
   // { 'Q3Q4_2026': [ {exercise_slug, target_value, target_unit, target_note, sort_order}, ... ] }
   programSel: {},
   programLoaded: false,
+  programSeededFromTemplate: {},  // { quarterId: true } — set saat builder di-seed dari gym_program
+
+  // suppress per-quarter unmatched warnings
+  _seedWarnedQuarters: {},
 
   // gym
   gymProgram: [],      // template exercises from DB
@@ -75,4 +79,11 @@ export function weekFromDate(dateStr, protocolStart='2026-07-06'){
   const diff = Math.floor((d - s) / (1000*60*60*24));
   if(diff < 0) return null;
   return Math.min(Math.floor(diff/7)+1, 56);
+}
+
+export function findLibraryByName(name){
+  if(!name) return null;
+  const lib = S.exerciseLibrary || [];
+  const n = name.trim().toLowerCase();
+  return lib.find(e => e.name.trim().toLowerCase() === n) || null;
 }

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate } from './state.js';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -115,6 +115,7 @@ export function pBuilder(){
     return true;
   });
 
+  const seeded = !!S.programSeededFromTemplate[S.quarterId];
   return `
     <div class="bld-bar">
       <div class="bld-bar-l">
@@ -125,6 +126,11 @@ export function pBuilder(){
         <span class="bld-bar-cnt">${sel.length} exercise dipilih</span>
       </div>
     </div>
+    ${seeded ? `
+    <div style="font-size:10.5px;color:var(--t2);padding:.45rem .7rem;background:rgba(50,140,255,.08);border:1px solid rgba(50,140,255,.18);border-radius:6px;margin-bottom:.6rem;display:flex;align-items:center;gap:8px">
+      <span style="flex:1">💡 Auto-populated dari template Quarter ini. Edit (hapus / ganti target / tambah variasi) sesuai intensitas quarter.</span>
+      <button onclick="dismissSeedBanner()" style="background:transparent;border:1px solid var(--bdr);color:var(--t2);padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer">Tutup</button>
+    </div>` : ''}
 
     <div class="bld-2col">
       <!-- LEFT: LIBRARY -->
@@ -578,7 +584,9 @@ export function pMarkdownContent(docType, content){
 
 // ── GYM: LOG SESI ────────────────────────────────────────
 export function pGymLog(){
-  const prog = S.gymProgram;
+  const prog = Array.isArray(S.gymProgram) ? S.gymProgram : [];
+  const sel = (S.programSel && S.programSel[S.quarterId]) || [];
+  const selSlugs = new Set(sel.map(s => s.exercise_slug));
   const today = new Date().toISOString().split('T')[0];
 
   const blocksHtml = ['A','B','C','D'].map(b => {
@@ -590,8 +598,14 @@ export function pGymLog(){
       ${exs.map(e => {
         const sets = S.gymDraft.sets.filter(s => s.exercise===e.exercise);
         const setCount = e.target_sets || 3;
-        return `<div style="margin-bottom:.75rem">
-          <div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:6px">${e.exercise}
+        const lib = findLibraryByName(e.exercise);
+        const isActive = !!(lib && selSlugs.has(lib.slug));
+        const statusBadge = isActive
+          ? `<span class="bdg bdg-acc" style="margin-left:6px;font-size:9px">● Program</span>`
+          : `<span class="bdg" style="margin-left:6px;font-size:9px;opacity:.55">○ Template</span>`;
+        const wrapStyle = isActive ? '' : 'opacity:.6';
+        return `<div style="margin-bottom:.75rem;${wrapStyle}">
+          <div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:6px">${e.exercise}${statusBadge}
             <span style="font-size:10px;font-weight:600;color:var(--t2);margin-left:6px">${e.target_sets}×${e.target_reps} @ RPE ${e.target_rpe}</span>
           </div>
           ${Array.from({length:setCount},(_,i)=>{

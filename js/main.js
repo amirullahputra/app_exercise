@@ -25,6 +25,7 @@ import {
   loadCardioLog, saveCardioEntry, deleteCardioEntry,
   loadExerciseLibrary,
   loadProgramSelections, addProgramSelection, removeProgramSelection, updateProgramTarget,
+  seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
 } from './supabase.js';
@@ -63,13 +64,25 @@ function getContent(docType){
 }
 
 function renderPanel(){
-  let html = '';
-  if(S.tab===0)      html = pOverview();
-  else if(S.tab===1) html = pBuilder();
-  else if(S.tab===2) html = pPlan();
-  else if(S.tab===3) html = pLog();
-  else               html = pLibrary();
-  document.getElementById('panels-root').innerHTML = html;
+  const root = document.getElementById('panels-root');
+  if(!root) return;
+  const tabName = ['Overview','Builder','Plan','Log','Library'][S.tab] || `Tab ${S.tab}`;
+  try {
+    let html = '';
+    if(S.tab===0)      html = pOverview();
+    else if(S.tab===1) html = pBuilder();
+    else if(S.tab===2) html = pPlan();
+    else if(S.tab===3) html = pLog();
+    else               html = pLibrary();
+    root.innerHTML = html;
+  } catch(e){
+    console.error(`renderPanel(${tabName}):`, e);
+    root.innerHTML = `<div class="card" style="padding:1.25rem 1.5rem;border-left:4px solid #EF4444;background:#FEE2E2">
+      <div style="font-size:14px;font-weight:800;color:#991B1B;margin-bottom:8px">🔥 Panel Error — ${tabName}</div>
+      <div style="font-size:11.5px;color:#1A2140;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;background:white;padding:10px;border-radius:6px;border:1px solid #FCA5A5;max-height:300px;overflow:auto">${(e.stack||e.message||e).toString().replace(/</g,'&lt;')}</div>
+      <div style="font-size:10.5px;color:#6B7280;margin-top:10px">Tab lain masih bisa diklik. Refresh setelah fix.</div>
+    </div>`;
+  }
 }
 
 function render(){
@@ -112,7 +125,37 @@ async function refreshData(){
     S.programSel = await loadProgramSelections(S.user.id);
     S.programLoaded = true;
   } catch(e){ console.error('loadProgramSelections:', e); }
+  await maybeSeedBuilder();
 }
+
+// Pre-populate Builder dari gym_program saat user pertama kali load quarter
+// (atau ganti quarter) dan programSel kosong.
+async function maybeSeedBuilder(){
+  if(!S.user) return;
+  const qid = S.quarterId;
+  const existing = S.programSel[qid] || [];
+  if(existing.length > 0) return;
+  if(!S.gymProgram?.length) return;
+  if(!S.exerciseLibrary?.length) return;
+  try {
+    const { inserted, unmatched } = await seedSelectionsFromGymProgram(
+      S.user.id, qid, S.gymProgram, S.exerciseLibrary
+    );
+    if(inserted.length){
+      S.programSel[qid] = inserted;
+      S.programSeededFromTemplate[qid] = true;
+    }
+    if(unmatched.length && !S._seedWarnedQuarters[qid]){
+      console.warn(`[seedBuilder ${qid}] no library match for:`, unmatched);
+      S._seedWarnedQuarters[qid] = true;
+    }
+  } catch(e){ console.error('maybeSeedBuilder:', e); }
+}
+
+window.dismissSeedBanner = function(){
+  delete S.programSeededFromTemplate[S.quarterId];
+  renderPanel();
+};
 
 // ── PROGRAM CART (drag & drop) ──
 window.onDragStart = function(ev, slug){
