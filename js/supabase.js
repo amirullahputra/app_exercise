@@ -52,12 +52,15 @@ export async function getCurrentUser(){
 
 // ── QUARTERS ──
 let _quarters = null;
+let _quartersLoaded = false;
 export async function loadQuarters(){
-  if(_quarters) return _quarters;
-  const { data } = await supa.from('quarters')
+  if(_quartersLoaded) return _quarters;
+  const { data, error } = await supa.from('quarters')
     .select('quarter_id,phase_type,window_raw,total_weeks,bb_start,bb_end,bf_start,bf_end')
     .order('quarter_id');
+  if(error){ console.error('loadQuarters:', error); throw error; }
   _quarters = data || [];
+  _quartersLoaded = true;
   return _quarters;
 }
 
@@ -146,13 +149,15 @@ export async function deleteCardioEntry(id){
 
 // ── EXERCISE LIBRARY (Phase 1: read-only reference) ──
 let _exerciseLibrary = null;
+let _exerciseLibraryLoaded = false;
 export async function loadExerciseLibrary(){
-  if(_exerciseLibrary) return _exerciseLibrary;
+  if(_exerciseLibraryLoaded) return _exerciseLibrary;
   const { data, error } = await supa.from('exercise_library')
     .select('*')
     .order('category').order('sort_order');
-  if(error){ console.error('loadExerciseLibrary:', error); return []; }
+  if(error){ console.error('loadExerciseLibrary:', error); throw error; }
   _exerciseLibrary = data || [];
+  _exerciseLibraryLoaded = true;
   return _exerciseLibrary;
 }
 

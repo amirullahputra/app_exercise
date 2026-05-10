@@ -206,8 +206,8 @@ window.deleteCardio = async function(id){
 window.onAuthBtnClick = onAuthBtnClick;
 window.closeAuthModal = closeAuthModal;
 window.doLogin = doLogin;
-document.getElementById('auth-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAuthModal();});
-document.getElementById('auth-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('auth-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeAuthModal();});
+document.getElementById('auth-pass')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 // ── LIBRARY FILTERS ──
 window.setLibFilter = function(field, value){
@@ -236,20 +236,34 @@ window.selectBodyMuscle = function(slug){
   renderPanel();
 };
 
+// ── ERROR BANNER ──
+function showInitError(msg){
+  const root = document.getElementById('panels-root');
+  if(!root) return;
+  root.innerHTML = `<div class="card" style="padding:1.25rem 1.5rem;border-left:4px solid var(--warn);background:var(--warn-bg)">
+    <div style="font-size:14px;font-weight:800;color:var(--warn);margin-bottom:8px">⚠️ Init Error — App tidak bisa load data</div>
+    <div style="font-size:11.5px;color:var(--t1);font-family:'JetBrains Mono',monospace;white-space:pre-wrap;background:var(--bg1);padding:10px;border-radius:6px;border:1px solid var(--bdr)">${msg}</div>
+    <div style="font-size:10.5px;color:var(--t3);margin-top:10px">Buka F12 → Console untuk detail. Pastikan Supabase RLS allow public read untuk tables: quarters, quarter_content, gym_program, exercise_library.</div>
+  </div>`;
+}
+
 // ── INIT ──
 (async()=>{
+  const errs = [];
+  try { S.quarters = await loadQuarters(); } catch(e){ errs.push('loadQuarters: '+(e.message||e)); S.quarters=[]; }
+  if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
+
+  try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ errs.push('loadExerciseLibrary: '+(e.message||e)); S.exerciseLibrary=[]; }
+  try { await loadContent(); } catch(e){ errs.push('loadContent: '+(e.message||e)); }
+  try { S.gymProgram = await loadGymProgram(S.quarterId); } catch(e){ errs.push('loadGymProgram: '+(e.message||e)); S.gymProgram=[]; }
+
   try {
-    try { S.quarters = await loadQuarters(); } catch(e){ console.error('loadQuarters:',e); S.quarters=[]; }
-    if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
-
-    try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ console.error('loadExerciseLibrary:',e); S.exerciseLibrary=[]; }
-    try { await loadContent(); } catch(e){ console.error('loadContent:',e); }
-    try { S.gymProgram = await loadGymProgram(S.quarterId); } catch(e){ console.error('loadGymProgram:',e); S.gymProgram=[]; }
-
     setupAuthListener(
       async(user)=>{ S.user=user; try{ await refreshData(); }catch(e){ console.error('refreshData:',e); } render(); },
       ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; render(); }
     );
-  } catch(e){ console.error('init fatal:',e); }
+  } catch(e){ errs.push('setupAuthListener: '+(e.message||e)); }
+
   render();
+  if(errs.length) showInitError(errs.join('\n'));
 })();
