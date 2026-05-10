@@ -5,8 +5,6 @@ const SUPA_URL = 'https://guhhoqpvwzzrlwgfugsb.supabase.co';
 const SUPA_KEY = 'sb_publishable_yu8KTS5mId2hV7kVjScvZA_-geYqKHv';
 export const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
-function usernameToEmail(u){ return u.trim().toLowerCase().replace(/\s+/g,'_')+'@peptideapp.local'; }
-
 // ── AUTH ──
 export function openAuthModal(){ document.getElementById('auth-modal').classList.add('open'); }
 export function closeAuthModal(){ document.getElementById('auth-modal').classList.remove('open'); document.getElementById('auth-err').textContent=''; }
@@ -15,7 +13,7 @@ export function updateAuthUI(user){
   const lbl = document.getElementById('auth-user-label');
   const btn = document.getElementById('auth-action-btn');
   if(user){
-    lbl.textContent = '👤 ' + user.email.replace('@peptideapp.local','');
+    lbl.textContent = '👤 ' + (user.email.split('@')[0]);
     btn.textContent = 'Logout'; btn.classList.add('logout');
   } else {
     lbl.textContent = ''; btn.textContent = 'Login'; btn.classList.remove('logout');
@@ -29,13 +27,13 @@ export function onAuthBtnClick(){
 }
 
 export async function doLogin(){
-  const user = document.getElementById('auth-user').value.trim();
-  const pass = document.getElementById('auth-pass').value;
+  const email = document.getElementById('auth-user').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
   const errEl = document.getElementById('auth-err');
   errEl.textContent = '';
-  if(!user){ errEl.textContent = 'Username kosong.'; return; }
-  const { error } = await supa.auth.signInWithPassword({ email: usernameToEmail(user), password: pass });
-  if(error){ errEl.textContent = 'Username atau password salah.'; return; }
+  if(!email){ errEl.textContent = 'Email kosong.'; return; }
+  const { error } = await supa.auth.signInWithPassword({ email, password: pass });
+  if(error){ errEl.textContent = 'Email atau password salah.'; return; }
   closeAuthModal();
 }
 
