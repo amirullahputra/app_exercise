@@ -144,6 +144,18 @@ export async function deleteCardioEntry(id){
   await supa.from('cardio_log').delete().eq('id', id);
 }
 
+// ── EXERCISE LIBRARY (Phase 1: read-only reference) ──
+let _exerciseLibrary = null;
+export async function loadExerciseLibrary(){
+  if(_exerciseLibrary) return _exerciseLibrary;
+  const { data, error } = await supa.from('exercise_library')
+    .select('*')
+    .order('category').order('sort_order');
+  if(error){ console.error('loadExerciseLibrary:', error); return []; }
+  _exerciseLibrary = data || [];
+  return _exerciseLibrary;
+}
+
 // ── BODY COMP LOG ──
 export async function loadBodyComp(userId, quarterId){
   const { data } = await supa.from('body_comp_log')

@@ -385,3 +385,84 @@ input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;height:4px}
 .g-cell:hover{opacity:.75;transform:scaleY(1.15)}
 .g-custom{outline:2px solid var(--hor);outline-offset:-2px}
 .g-custom::after{content:'✎';position:absolute;top:0;right:1px;font-size:7px;color:var(--hor);line-height:18px}
+
+/* ════════════════════════════════════════════════════════════
+   EXERCISE LIBRARY (Phase 1)
+   ════════════════════════════════════════════════════════════ */
+
+/* ── FILTER BAR ── */
+.lib-filter-bar{background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r2);padding:.875rem 1rem;margin-bottom:1rem;box-shadow:var(--shadow-sm)}
+.lib-search{display:flex;gap:8px;margin-bottom:.875rem}
+.lib-search-inp{flex:1;background:var(--bg2);border:1.5px solid var(--bdr2);border-radius:var(--r);color:var(--t0);padding:9px 14px;outline:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;transition:.15s}
+.lib-search-inp:focus{border-color:var(--acc);background:#fff}
+.lib-search-inp::placeholder{color:var(--t3)}
+.lib-reset-btn{background:var(--warn-bg);border:1px solid var(--warn-bdr);color:var(--warn);padding:8px 14px;border-radius:var(--r);font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.lib-reset-btn:hover{background:var(--warn);color:#fff}
+
+.lib-chip-group{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:.5rem}
+.lib-chip-lbl{font-size:9.5px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-right:6px;min-width:65px}
+.lib-chip{background:var(--bg2);border:1.5px solid var(--bdr2);border-radius:20px;color:var(--t2);padding:5px 11px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.lib-chip:hover{border-color:var(--acc);color:var(--acc)}
+.lib-chip.act{background:var(--acc);color:#fff;border-color:var(--acc);box-shadow:0 2px 6px rgba(67,97,238,.25)}
+.lib-chip-sm{font-size:10.5px;padding:4px 10px}
+.lib-chip-cnt{background:rgba(0,0,0,.08);padding:1px 6px;border-radius:10px;font-size:9px;font-weight:800}
+.lib-chip.act .lib-chip-cnt{background:rgba(255,255,255,.25)}
+
+/* Per-category chip color when active */
+.lib-chip.chip-f1.act{background:var(--f1);border-color:var(--f1);box-shadow:0 2px 6px rgba(255,107,53,.25)}
+.lib-chip.chip-acc.act{background:var(--acc);border-color:var(--acc)}
+.lib-chip.chip-f3.act{background:var(--f3);border-color:var(--f3);box-shadow:0 2px 6px rgba(16,185,129,.25)}
+.lib-chip.chip-cns.act{background:var(--cns);border-color:var(--cns);box-shadow:0 2px 6px rgba(139,92,246,.25)}
+.lib-chip.chip-inf.act{background:var(--inf);border-color:var(--inf);box-shadow:0 2px 6px rgba(14,165,233,.25)}
+.lib-chip.chip-t1.act{background:var(--t1);border-color:var(--t1)}
+
+.lib-result-count{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--bdr);font-size:10.5px;color:var(--t3);font-weight:700;letter-spacing:.3px}
+
+/* ── CARD GRID ── */
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+
+.lib-card{background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r2);padding:.875rem 1rem;box-shadow:var(--shadow-sm);transition:all .2s;border-left:4px solid var(--bdr2)}
+.lib-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--bdr3)}
+.lib-card-f1{border-left-color:var(--f1)}
+.lib-card-acc{border-left-color:var(--acc)}
+.lib-card-f3{border-left-color:var(--f3)}
+.lib-card-cns{border-left-color:var(--cns)}
+.lib-card-inf{border-left-color:var(--inf)}
+.lib-card-t1{border-left-color:var(--t1)}
+
+.lib-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.lib-cat-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.6px;background:var(--bg2);color:var(--t2);border:1px solid var(--bdr)}
+.lib-cat-pill.chip-f1{background:var(--f1-bg);color:var(--f1);border-color:var(--f1-bdr)}
+.lib-cat-pill.chip-acc{background:var(--acc-bg);color:var(--acc);border-color:var(--acc-bdr)}
+.lib-cat-pill.chip-f3{background:var(--f3-bg);color:var(--f3);border-color:var(--f3-bdr)}
+.lib-cat-pill.chip-cns{background:var(--cns-bg);color:var(--cns);border-color:var(--cns-bdr)}
+.lib-cat-pill.chip-inf{background:var(--inf-bg);color:var(--inf);border-color:var(--inf-bdr)}
+.lib-risk-pill{font-size:9px;font-weight:800;padding:3px 8px}
+
+.lib-card-name{font-size:14px;font-weight:800;color:var(--t0);margin-bottom:2px;line-height:1.25}
+.lib-card-sub{font-size:10px;color:var(--t3);margin-bottom:.625rem;text-transform:capitalize}
+
+.lib-musc-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.625rem}
+.lib-musc{display:inline-block;font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--bg2);color:var(--t2);text-transform:capitalize;border:1px solid var(--bdr)}
+.lib-musc-pri{background:var(--acc-bg);color:var(--acc);font-weight:700;border-color:var(--acc-bdr)}
+
+.lib-defaults{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:.625rem;padding:.5rem .625rem;background:var(--bg2);border-radius:var(--r);border:1px solid var(--bdr)}
+.lib-d-item{display:flex;flex-direction:column;gap:1px;min-width:60px}
+.lib-d-l{font-size:8.5px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.4px}
+.lib-d-v{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--t0)}
+
+.lib-mech{font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:.5rem}
+.lib-cues,.lib-balance,.lib-contra{font-size:10.5px;color:var(--t1);line-height:1.45;padding:5px 8px;border-radius:var(--r);margin-top:5px}
+.lib-cues{background:var(--bg2);border-left:2px solid var(--acc)}
+.lib-balance{background:var(--cns-bg);border-left:2px solid var(--cns);color:var(--cns)}
+.lib-contra{background:var(--warn-bg);border-left:2px solid var(--warn);color:var(--warn)}
+.lib-cues b,.lib-balance b,.lib-contra b{font-weight:800;color:inherit}
+
+/* ── MOBILE ── */
+@media(max-width:480px){
+  .lib-grid{grid-template-columns:1fr;gap:10px}
+  .lib-filter-bar{padding:.75rem .875rem}
+  .lib-chip-lbl{min-width:auto;width:100%;margin-bottom:3px}
+  .lib-chip{font-size:10.5px;padding:4px 10px}
+  .lib-card{padding:.75rem .875rem}
+}

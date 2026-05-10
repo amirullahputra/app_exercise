@@ -1,10 +1,159 @@
 // ══════════════════════════════════════════════════════════
-// PANELS — Gym + Cardio
+// PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
 import { S, rpeColor, fmtDate } from './state.js';
 
 export const GYM_TABS  = ['📖 Protocol','🏋️ Log Sesi','📈 Progression'];
 export const CARD_TABS = ['📝 Log Harian','📊 Weekly','📖 Protocol'];
+
+// ── LIBRARY METADATA ─────────────────────────────────────
+const CAT_META = {
+  compound:  { label:'Compound',  icon:'🔥', color:'f1' },
+  isolation: { label:'Isolation', icon:'💪', color:'acc' },
+  run:       { label:'Run',       icon:'🏃', color:'f3' },
+  bike:      { label:'Bike',      icon:'🚴', color:'f3' },
+  swim:      { label:'Swim',      icon:'🏊', color:'inf' },
+  mobility:  { label:'Mobility',  icon:'🧘', color:'cns' },
+  stability: { label:'Stability', icon:'🎯', color:'inf' },
+};
+
+const CAT_ORDER = ['all','compound','isolation','run','bike','swim','mobility','stability'];
+
+const MUSCLE_LIST = [
+  ['all','All'],
+  ['chest','Chest'],['back','Back'],['lats','Lats'],
+  ['quads','Quads'],['hamstrings','Hamstring'],['glutes','Glutes'],
+  ['shoulders','Shoulder'],['rear_delts','Rear Delt'],
+  ['biceps','Biceps'],['triceps','Triceps'],
+  ['core','Core'],['abs','Abs'],['obliques','Obliques'],
+  ['calves','Calves'],['forearms','Forearms'],
+  ['hips','Hips'],['adductors','Adductors'],
+  ['rotator_cuff','Rot. Cuff'],['thoracic_spine','T-Spine'],
+];
+
+const EQ_LIST = [
+  ['all','All'],['barbell','Barbell'],['dumbbell','DB'],
+  ['machine','Machine'],['cable','Cable'],['bodyweight','BW'],
+  ['treadmill','Treadmill'],['bike','Bike'],['pool','Pool'],['band','Band'],
+];
+
+// ── LIBRARY PANEL ────────────────────────────────────────
+export function pLibrary(){
+  const all = S.exerciseLibrary || [];
+  const f = S.libFilters;
+
+  const filtered = all.filter(e => {
+    if(f.category !== 'all' && e.category !== f.category) return false;
+    if(f.muscle !== 'all'){
+      const all = (e.primary_muscles||[]).concat(e.secondary_muscles||[]);
+      if(!all.includes(f.muscle)) return false;
+    }
+    if(f.equipment !== 'all' && e.equipment !== f.equipment) return false;
+    if(f.search){
+      const q = f.search.toLowerCase();
+      if(!e.name.toLowerCase().includes(q) &&
+         !(e.mechanism||'').toLowerCase().includes(q) &&
+         !(e.subcategory||'').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Count by category for chip badges
+  const catCount = {};
+  all.forEach(e => { catCount[e.category] = (catCount[e.category]||0) + 1; });
+  catCount.all = all.length;
+
+  const filterBar = `
+    <div class="lib-filter-bar">
+      <div class="lib-search">
+        <input type="search" class="lib-search-inp" placeholder="🔍 Cari gerakan, otot, tipe..."
+          value="${f.search}" oninput="setLibSearch(this.value)">
+        ${(f.search||f.category!=='all'||f.muscle!=='all'||f.equipment!=='all') ?
+          `<button class="lib-reset-btn" onclick="resetLibFilters()">✕ Reset</button>` : ''}
+      </div>
+      <div class="lib-chip-group">
+        <span class="lib-chip-lbl">Kategori</span>
+        ${CAT_ORDER.map(c=>{
+          const m = c==='all' ? {label:'Semua',icon:'🌐',color:'t1'} : CAT_META[c];
+          const cnt = catCount[c]||0;
+          return `<button class="lib-chip${f.category===c?' act':''} chip-${m.color}" onclick="setLibFilter('category','${c}')">
+            ${m.icon} ${m.label} <span class="lib-chip-cnt">${cnt}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="lib-chip-group">
+        <span class="lib-chip-lbl">Otot</span>
+        ${MUSCLE_LIST.map(([k,l])=>`
+          <button class="lib-chip lib-chip-sm${f.muscle===k?' act':''}" onclick="setLibFilter('muscle','${k}')">${l}</button>
+        `).join('')}
+      </div>
+      <div class="lib-chip-group">
+        <span class="lib-chip-lbl">Equipment</span>
+        ${EQ_LIST.map(([k,l])=>`
+          <button class="lib-chip lib-chip-sm${f.equipment===k?' act':''}" onclick="setLibFilter('equipment','${k}')">${l}</button>
+        `).join('')}
+      </div>
+      <div class="lib-result-count">${filtered.length} dari ${all.length} gerakan</div>
+    </div>`;
+
+  if(!all.length){
+    return filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">📚</div><div class="empty-txt">Library belum ter-load. Pastikan SQL seed (08_insert_exercise_library.sql) sudah dijalankan di Supabase.</div></div></div>`;
+  }
+
+  if(!filtered.length){
+    return filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
+  }
+
+  const grid = `<div class="lib-grid">${filtered.map(renderLibCard).join('')}</div>`;
+  return filterBar + grid;
+}
+
+function renderLibCard(e){
+  const meta = CAT_META[e.category] || { label:e.category, icon:'•', color:'t1' };
+  const riskColor = e.power_risk === 'HIGH' ? 'warn' : e.power_risk === 'MED' ? 'f2' : 'f3';
+  const isCardio = ['run','bike','swim'].includes(e.category);
+
+  // Defaults block — beda format antara strength vs cardio
+  let defaults = '';
+  if(isCardio){
+    defaults = `
+      <div class="lib-defaults">
+        <span class="lib-d-item"><span class="lib-d-l">Durasi</span><span class="lib-d-v">${e.default_duration_min||'—'} min</span></span>
+        ${e.default_distance_km ? `<span class="lib-d-item"><span class="lib-d-l">Jarak</span><span class="lib-d-v">${e.default_distance_km} km</span></span>` : ''}
+        ${e.default_zone ? `<span class="lib-d-item"><span class="lib-d-l">Zone</span><span class="bdg bdg-z${e.default_zone.slice(1)}">${e.default_zone}</span></span>` : ''}
+      </div>`;
+  } else {
+    const setsReps = (e.default_sets && e.default_reps) ? `${e.default_sets}×${e.default_reps}` : (e.default_reps || '—');
+    defaults = `
+      <div class="lib-defaults">
+        <span class="lib-d-item"><span class="lib-d-l">Set/Reps</span><span class="lib-d-v">${setsReps}</span></span>
+        ${e.default_rpe ? `<span class="lib-d-item"><span class="lib-d-l">RPE</span><span class="lib-d-v">${e.default_rpe}</span></span>` : ''}
+        ${e.default_rest_s ? `<span class="lib-d-item"><span class="lib-d-l">Rest</span><span class="lib-d-v">${e.default_rest_s}s</span></span>` : ''}
+      </div>`;
+  }
+
+  const primary = (e.primary_muscles||[]).map(m=>`<span class="lib-musc lib-musc-pri">${m.replace(/_/g,' ')}</span>`).join('');
+  const secondary = (e.secondary_muscles||[]).slice(0,4).map(m=>`<span class="lib-musc">+${m.replace(/_/g,' ')}</span>`).join('');
+
+  return `
+    <div class="lib-card lib-card-${meta.color}">
+      <div class="lib-card-head">
+        <span class="lib-cat-pill chip-${meta.color}">${meta.icon} ${meta.label.toUpperCase()}</span>
+        ${e.power_risk ? `<span class="lib-risk-pill bdg bdg-${riskColor}" title="Power risk untuk DNA-power athlete">⚠ ${e.power_risk}</span>` : ''}
+      </div>
+      <div class="lib-card-name">${e.name}</div>
+      ${e.subcategory ? `<div class="lib-card-sub">${e.subcategory}${e.equipment ? ' · '+e.equipment : ''}${e.difficulty ? ' · '+e.difficulty : ''}</div>` : ''}
+
+      <div class="lib-musc-row">${primary}${secondary}</div>
+
+      ${defaults}
+
+      ${e.mechanism ? `<div class="lib-mech">${e.mechanism}</div>` : ''}
+      ${e.form_cues ? `<div class="lib-cues"><b>Form:</b> ${e.form_cues}</div>` : ''}
+      ${e.balance_for ? `<div class="lib-balance"><b>↔ Balance:</b> ${e.balance_for.replace(/;/g,' · ').replace(/_/g,' ')}</div>` : ''}
+      ${e.contraindication ? `<div class="lib-contra"><b>⚠ Hati-hati:</b> ${e.contraindication}</div>` : ''}
+    </div>`;
+}
 
 // ── MARKDOWN RENDER ──────────────────────────────────────
 function renderInline(text){

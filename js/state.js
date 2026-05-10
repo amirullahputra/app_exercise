@@ -2,11 +2,20 @@
 // STATE
 // ══════════════════════════════════════════════════════════
 export const S = {
-  layer: 'gym',        // 'gym' | 'cardio'
+  layer: 'library',    // 'library' | 'gym' | 'cardio'
   tab: 0,
   quarterId: 'Q3Q4_2026',
   quarters: [],
   user: null,
+
+  // exercise library (Phase 1)
+  exerciseLibrary: [],
+  libFilters: {
+    search: '',
+    category: 'all',   // 'all'|'compound'|'isolation'|'run'|'bike'|'swim'|'mobility'|'stability'
+    muscle: 'all',
+    equipment: 'all',
+  },
 
   // gym
   gymProgram: [],      // template exercises from DB

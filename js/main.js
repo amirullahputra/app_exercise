@@ -6,6 +6,7 @@ import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
   saveGymSession, saveGymSets, deleteGymSession,
   loadCardioLog, saveCardioEntry, deleteCardioEntry,
+  loadExerciseLibrary,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
 } from './supabase.js';
@@ -13,26 +14,39 @@ import {
   GYM_TABS, CARD_TABS,
   pGymLog, pGymProgression,
   pCardioLog, pCardioWeekly,
-  pMarkdownContent
+  pMarkdownContent,
+  pLibrary
 } from './panels.js';
 
 // ── RENDER ──
 function renderLayerRow(){
-  document.getElementById('layer-row').innerHTML = ['gym','cardio'].map(l=>`
-    <button class="layer-btn ${l}${S.layer===l?' act':''}" onclick="setLayer('${l}')">
-      ${l==='gym'?'🏋️ Gym':'🏃 Cardio'}
-    </button>`).join('');
+  const layers = [
+    { k:'library', l:'📚 Library' },
+    { k:'gym',     l:'🏋️ Gym' },
+    { k:'cardio',  l:'🏃 Cardio' },
+  ];
+  document.getElementById('layer-row').innerHTML = layers.map(({k,l})=>`
+    <button class="layer-btn ${k}${S.layer===k?' act':''}" onclick="setLayer('${k}')">${l}</button>
+  `).join('');
 }
 
 function renderQselRow(){
-  document.getElementById('qsel-row').innerHTML =
+  const el = document.getElementById('qsel-row');
+  // Library layer = lintas-quarter, sembunyikan quarter selector
+  if(S.layer==='library'){ el.style.display='none'; return; }
+  el.style.display='';
+  el.innerHTML =
     `<span class="qsel-lbl">Quarter</span>` +
     S.quarters.map(q=>`<button class="qsel-btn${S.quarterId===q.quarter_id?' act':''}" onclick="setQuarter('${q.quarter_id}')">${q.quarter_id.replace('_',' ')}</button>`).join('');
 }
 
 function renderTabNav(){
+  const el = document.getElementById('tab-nav');
+  // Library = single panel, no tabs
+  if(S.layer==='library'){ el.style.display='none'; return; }
+  el.style.display='';
   const tabs = S.layer==='gym' ? GYM_TABS : CARD_TABS;
-  document.getElementById('tab-nav').innerHTML = tabs.map((t,i)=>
+  el.innerHTML = tabs.map((t,i)=>
     `<button class="tab-btn${S.tab===i?' act':''}" onclick="setTab(${i})">${t}</button>`
   ).join('');
 }
@@ -43,7 +57,9 @@ function getContent(docType){
 
 function renderPanel(){
   let html = '';
-  if(S.layer==='gym'){
+  if(S.layer==='library'){
+    html = pLibrary();
+  } else if(S.layer==='gym'){
     if(S.tab===0)      html = pMarkdownContent('GYM', getContent('GYM'));
     else if(S.tab===1) html = pGymLog();
     else               html = pGymProgression();
@@ -193,10 +209,27 @@ window.doLogin = doLogin;
 document.getElementById('auth-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAuthModal();});
 document.getElementById('auth-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
+// ── LIBRARY FILTERS ──
+window.setLibFilter = function(field, value){
+  S.libFilters[field] = value;
+  renderPanel();
+};
+window.setLibSearch = function(value){
+  S.libFilters.search = value;
+  renderPanel();
+};
+window.resetLibFilters = function(){
+  S.libFilters = { search:'', category:'all', muscle:'all', equipment:'all' };
+  render();
+};
+
 // ── INIT ──
 (async()=>{
   S.quarters = await loadQuarters();
   if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
+
+  // Library lintas-quarter — load sekali di awal
+  S.exerciseLibrary = await loadExerciseLibrary();
 
   await loadContent();
   S.gymProgram = await loadGymProgram(S.quarterId);
