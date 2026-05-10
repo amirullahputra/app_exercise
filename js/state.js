@@ -16,6 +16,7 @@ export const S = {
     muscle: 'all',
     equipment: 'all',
   },
+  libView: 'grid',     // 'grid' | 'map'
 
   // gym
   gymProgram: [],      // template exercises from DB

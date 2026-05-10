@@ -220,7 +220,20 @@ window.setLibSearch = function(value){
 };
 window.resetLibFilters = function(){
   S.libFilters = { search:'', category:'all', muscle:'all', equipment:'all' };
+  S.libView = 'grid';
   render();
+};
+
+// ── BODY MAP ──
+window.setLibView = function(view){
+  S.libView = view;
+  renderPanel();
+};
+
+window.selectBodyMuscle = function(slug){
+  S.libFilters.muscle = slug;
+  S.libView = 'grid';
+  renderPanel();
 };
 
 // ── INIT ──

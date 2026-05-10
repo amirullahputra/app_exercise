@@ -42,6 +42,12 @@ export function pLibrary(){
   const all = S.exerciseLibrary || [];
   const f = S.libFilters;
 
+  const viewToggle = `
+    <div class="lib-view-toggle">
+      <button class="lib-vtgl${S.libView!=='map'?' act':''}" onclick="setLibView('grid')">📋 Grid</button>
+      <button class="lib-vtgl${S.libView==='map'?' act':''}" onclick="setLibView('map')">🫀 Body Map</button>
+    </div>`;
+
 
   const filtered = all.filter(e => {
     if(f.category !== 'all' && e.category !== f.category) return false;
@@ -97,16 +103,161 @@ export function pLibrary(){
       <div class="lib-result-count">${filtered.length} dari ${all.length} gerakan</div>
     </div>`;
 
+  if(S.libView === 'map'){
+    return viewToggle + pBodyMap();
+  }
+
   if(!all.length){
-    return filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">📚</div><div class="empty-txt">Library belum ter-load. Pastikan SQL seed (08_insert_exercise_library.sql) sudah dijalankan di Supabase.</div></div></div>`;
+    return viewToggle + filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">📚</div><div class="empty-txt">Library belum ter-load. Pastikan SQL seed (08_insert_exercise_library.sql) sudah dijalankan di Supabase.</div></div></div>`;
   }
 
   if(!filtered.length){
-    return filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
+    return viewToggle + filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
   }
 
   const grid = `<div class="lib-grid">${filtered.map(renderLibCard).join('')}</div>`;
-  return filterBar + grid;
+  return viewToggle + filterBar + grid;
+}
+
+// ── BODY MAP ─────────────────────────────────────────────
+export function pBodyMap(){
+  const coverage = {};
+  (S.exerciseLibrary || []).forEach(e => {
+    (e.primary_muscles   || []).forEach(m => { coverage[m] = (coverage[m]||0) + 2; });
+    (e.secondary_muscles || []).forEach(m => { coverage[m] = (coverage[m]||0) + 1; });
+  });
+  const maxCov = Math.max(...Object.values(coverage), 1);
+
+  function muscleColor(slug){
+    const r = (coverage[slug]||0) / maxCov;
+    if(r === 0)   return 'var(--bg3)';
+    if(r < 0.20)  return '#DBEAFE';
+    if(r < 0.40)  return 'var(--inf)';
+    if(r < 0.65)  return 'var(--f1)';
+    return 'var(--warn)';
+  }
+
+  return `
+    <div class="bm-container">
+      <div class="bm-view-header">
+        <div class="bm-title">🫀 Body Map — Coverage Heatmap</div>
+        <div class="bm-subtitle">${(S.exerciseLibrary||[]).length} exercises · Klik otot untuk filter</div>
+      </div>
+      <div class="bm-svgs">
+        <div class="bm-svg-wrap"><div class="bm-svg-lbl">FRONT</div>${buildFrontSvg(muscleColor)}</div>
+        <div class="bm-svg-wrap"><div class="bm-svg-lbl">BACK</div>${buildBackSvg(muscleColor)}</div>
+      </div>
+      ${buildBmLegend(coverage)}
+    </div>`;
+}
+
+function buildFrontSvg(muscleColor){
+  const m = (slug, shapes) => shapes.map(s =>
+    `<${s.tag} class="bm-muscle" data-muscle="${slug}" onclick="selectBodyMuscle('${slug}')" style="cursor:pointer;fill:${muscleColor(slug)}" stroke="var(--bdr2)" stroke-width="1" ${s.attrs}/>`
+  ).join('');
+
+  return `<svg class="bm-svg" viewBox="0 0 120 260" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="60" cy="18" r="14" fill="var(--bg3)" stroke="var(--bdr2)" stroke-width="1"/>
+    <rect x="52" y="32" width="16" height="12" rx="4" fill="var(--bg3)" stroke="var(--bdr2)" stroke-width="1"/>
+    ${m('chest',[{tag:'ellipse',attrs:'cx="60" cy="72" rx="26" ry="18"'}])}
+    ${m('shoulders',[
+      {tag:'ellipse',attrs:'cx="26" cy="64" rx="12" ry="10"'},
+      {tag:'ellipse',attrs:'cx="94" cy="64" rx="12" ry="10"'}
+    ])}
+    ${m('biceps',[
+      {tag:'ellipse',attrs:'cx="16" cy="92" rx="8" ry="16"'},
+      {tag:'ellipse',attrs:'cx="104" cy="92" rx="8" ry="16"'}
+    ])}
+    ${m('forearms',[
+      {tag:'ellipse',attrs:'cx="13" cy="122" rx="6" ry="14"'},
+      {tag:'ellipse',attrs:'cx="107" cy="122" rx="6" ry="14"'}
+    ])}
+    ${m('abs',[{tag:'rect',attrs:'x="47" y="90" width="26" height="36" rx="6"'}])}
+    ${m('obliques',[
+      {tag:'polygon',attrs:'points="47,90 35,98 33,126 47,126"'},
+      {tag:'polygon',attrs:'points="73,90 85,98 87,126 73,126"'}
+    ])}
+    ${m('adductors',[{tag:'polygon',attrs:'points="54,148 66,148 64,196 56,196"'}])}
+    ${m('quads',[
+      {tag:'rect',attrs:'x="40" y="148" width="22" height="50" rx="8"'},
+      {tag:'rect',attrs:'x="58" y="148" width="22" height="50" rx="8"'}
+    ])}
+    ${m('calves',[
+      {tag:'ellipse',attrs:'cx="46" cy="222" rx="9" ry="16"'},
+      {tag:'ellipse',attrs:'cx="74" cy="222" rx="9" ry="16"'}
+    ])}
+  </svg>`;
+}
+
+function buildBackSvg(muscleColor){
+  const m = (slug, shapes) => shapes.map(s =>
+    `<${s.tag} class="bm-muscle" data-muscle="${slug}" onclick="selectBodyMuscle('${slug}')" style="cursor:pointer;fill:${muscleColor(slug)}" stroke="var(--bdr2)" stroke-width="1" ${s.attrs}/>`
+  ).join('');
+
+  return `<svg class="bm-svg" viewBox="0 0 120 260" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="60" cy="18" r="14" fill="var(--bg3)" stroke="var(--bdr2)" stroke-width="1"/>
+    <rect x="52" y="32" width="16" height="12" rx="4" fill="var(--bg3)" stroke="var(--bdr2)" stroke-width="1"/>
+    ${m('rear_delts',[
+      {tag:'ellipse',attrs:'cx="26" cy="64" rx="12" ry="10"'},
+      {tag:'ellipse',attrs:'cx="94" cy="64" rx="12" ry="10"'}
+    ])}
+    ${m('back',[{tag:'ellipse',attrs:'cx="60" cy="70" rx="24" ry="22"'}])}
+    ${m('lats',[
+      {tag:'polygon',attrs:'points="36,72 22,84 20,122 40,130"'},
+      {tag:'polygon',attrs:'points="84,72 98,84 100,122 80,130"'}
+    ])}
+    ${m('triceps',[
+      {tag:'ellipse',attrs:'cx="16" cy="94" rx="8" ry="16"'},
+      {tag:'ellipse',attrs:'cx="104" cy="94" rx="8" ry="16"'}
+    ])}
+    ${m('hips',[
+      {tag:'ellipse',attrs:'cx="24" cy="142" rx="10" ry="12"'},
+      {tag:'ellipse',attrs:'cx="96" cy="142" rx="10" ry="12"'}
+    ])}
+    ${m('glutes',[
+      {tag:'ellipse',attrs:'cx="46" cy="148" rx="22" ry="18"'},
+      {tag:'ellipse',attrs:'cx="74" cy="148" rx="22" ry="18"'}
+    ])}
+    ${m('hamstrings',[
+      {tag:'rect',attrs:'x="38" y="164" width="22" height="44" rx="8"'},
+      {tag:'rect',attrs:'x="60" y="164" width="22" height="44" rx="8"'}
+    ])}
+    ${m('calves',[
+      {tag:'ellipse',attrs:'cx="46" cy="222" rx="9" ry="16"'},
+      {tag:'ellipse',attrs:'cx="74" cy="222" rx="9" ry="16"'}
+    ])}
+  </svg>`;
+}
+
+function buildBmLegend(coverage){
+  const scale = [
+    { label:'Belum ada', color:'var(--bg3)' },
+    { label:'Sedikit',   color:'#DBEAFE' },
+    { label:'Sedang',    color:'var(--inf)' },
+    { label:'Banyak',    color:'var(--f1)' },
+    { label:'Terbanyak', color:'var(--warn)' },
+  ];
+
+  const topMuscles = Object.entries(coverage)
+    .sort(([,a],[,b])=>b-a).slice(0,8)
+    .map(([slug, cnt])=>
+      `<button class="bm-top-muscle" onclick="selectBodyMuscle('${slug}')">${slug.replace(/_/g,' ')} <span class="bm-top-cnt">${cnt}</span></button>`
+    ).join('');
+
+  return `
+    <div class="bm-legend">
+      <div class="bm-legend-scale">
+        ${scale.map(s=>`
+          <div class="bm-legend-item">
+            <span class="bm-legend-dot" style="background:${s.color}"></span>
+            <span class="bm-legend-txt">${s.label}</span>
+          </div>`).join('')}
+      </div>
+      <div class="bm-top-row">
+        <span class="bm-top-lbl">Paling banyak covered:</span>
+        ${topMuscles}
+      </div>
+    </div>`;
 }
 
 function renderLibCard(e){
