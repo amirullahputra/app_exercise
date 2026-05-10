@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Diagnostic Test</title>
+<style>
+  body{font-family:'Courier New',monospace;padding:20px;background:#f4f6fa;color:#1a2140;max-width:900px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px}
+  p{font-size:13px;color:#6b7aa0;margin:0 0 20px}
+  .test{background:white;border:2px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:12px}
+  .test h2{margin:0 0 8px;font-size:14px;font-weight:700}
+  .test.ok{border-color:#10b981;background:#d1fae5}
+  .test.err{border-color:#ef4444;background:#fee2e2}
+  .pre{background:#1a2140;color:#10b981;padding:10px;border-radius:6px;white-space:pre-wrap;font-size:11.5px;max-height:240px;overflow:auto;line-height:1.5}
+</style>
+</head>
+<body>
+<h1>🔬 Exercise FL Diagnostic Test</h1>
+<p>Setiap test akan ngasih tau apakah lolos (hijau) atau gagal (merah). Screenshot semua hasil dan kirim ke chat.</p>
+
+<div id="t1" class="test"><h2>Test 1: window.supabase loaded?</h2><div class="pre">Running...</div></div>
+<div id="t2" class="test"><h2>Test 2: Direct fetch to Supabase REST API</h2><div class="pre">Running...</div></div>
+<div id="t3" class="test"><h2>Test 3: window.supabase.createClient + .from()</h2><div class="pre">Running...</div></div>
+<div id="t4" class="test"><h2>Test 4: Import ./js/state.js</h2><div class="pre">Running...</div></div>
+<div id="t5" class="test"><h2>Test 5: Import ./js/supabase.js + call loadExerciseLibrary()</h2><div class="pre">Running...</div></div>
+<div id="t6" class="test"><h2>Test 6: Import ./js/panels.js (uji body map syntax)</h2><div class="pre">Running...</div></div>
+<div id="t7" class="test"><h2>Test 7: Import ./js/main.js (entry point full)</h2><div class="pre">Running...</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script type="module">
+  const setResult = (id, ok, msg) => {
+    const el = document.getElementById(id);
+    el.classList.add(ok ? 'ok' : 'err');
+    el.querySelector('.pre').textContent = msg;
+  };
+
+  // Test 1
+  try {
+    if(window.supabase && typeof window.supabase.createClient === 'function')
+      setResult('t1', true, '✓ window.supabase available\nKeys: '+Object.keys(window.supabase).slice(0,8).join(', ')+'...');
+    else
+      setResult('t1', false, '✗ window.supabase missing or invalid');
+  } catch(e){ setResult('t1', false, '✗ '+e.message); }
+
+  // Test 2
+  try {
+    const r = await fetch('https://guhhoqpvwzzrlwgfugsb.supabase.co/rest/v1/exercise_library?select=name&limit=3',
+      {headers:{apikey:'sb_publishable_yu8KTS5mId2hV7kVjScvZA_-geYqKHv'}});
+    const d = await r.json();
+    setResult('t2', r.ok, (r.ok?'✓':'✗')+' HTTP '+r.status+'\n'+JSON.stringify(d, null, 2));
+  } catch(e){ setResult('t2', false, '✗ '+e.message); }
+
+  // Test 3
+  try {
+    const supa = window.supabase.createClient(
+      'https://guhhoqpvwzzrlwgfugsb.supabase.co',
+      'sb_publishable_yu8KTS5mId2hV7kVjScvZA_-geYqKHv');
+    const { data, error } = await supa.from('exercise_library').select('name').limit(3);
+    if(error) setResult('t3', false, '✗ Error: '+JSON.stringify(error,null,2));
+    else setResult('t3', true, '✓ Got '+(data?.length||0)+' rows\n'+JSON.stringify(data, null, 2));
+  } catch(e){ setResult('t3', false, '✗ '+e.message+'\n'+e.stack); }
+
+  // Test 4
+  try {
+    const m = await import('./js/state.js');
+    setResult('t4', true, '✓ Loaded. Exports: '+Object.keys(m).join(', '));
+  } catch(e){ setResult('t4', false, '✗ '+e.message+'\n\nStack:\n'+(e.stack||'no stack')); }
+
+  // Test 5
+  try {
+    const m = await import('./js/supabase.js');
+    const lib = await m.loadExerciseLibrary();
+    setResult('t5', true, '✓ loadExerciseLibrary returned '+(lib?.length||0)+' rows\nFirst row: '+JSON.stringify(lib?.[0]||null, null, 2).slice(0,300));
+  } catch(e){ setResult('t5', false, '✗ '+e.message+'\n\nStack:\n'+(e.stack||'no stack')); }
+
+  // Test 6
+  try {
+    const m = await import('./js/panels.js');
+    setResult('t6', true, '✓ panels.js loaded. Exports: '+Object.keys(m).join(', '));
+  } catch(e){ setResult('t6', false, '✗ '+e.message+'\n\nStack:\n'+(e.stack||'no stack')); }
+
+  // Test 7
+  try {
+    await import('./js/main.js');
+    setResult('t7', true, '✓ main.js imported (init may have run)\nCheck if window.render is function: '+(typeof window.render));
+  } catch(e){ setResult('t7', false, '✗ '+e.message+'\n\nStack:\n'+(e.stack||'no stack')); }
+</script>
+</body>
+</html>
