@@ -238,19 +238,18 @@ window.selectBodyMuscle = function(slug){
 
 // ── INIT ──
 (async()=>{
-  S.quarters = await loadQuarters();
-  if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
+  try {
+    try { S.quarters = await loadQuarters(); } catch(e){ console.error('loadQuarters:',e); S.quarters=[]; }
+    if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
 
-  // Library lintas-quarter — load sekali di awal
-  S.exerciseLibrary = await loadExerciseLibrary();
+    try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ console.error('loadExerciseLibrary:',e); S.exerciseLibrary=[]; }
+    try { await loadContent(); } catch(e){ console.error('loadContent:',e); }
+    try { S.gymProgram = await loadGymProgram(S.quarterId); } catch(e){ console.error('loadGymProgram:',e); S.gymProgram=[]; }
 
-  await loadContent();
-  S.gymProgram = await loadGymProgram(S.quarterId);
-
-  setupAuthListener(
-    async(user)=>{ S.user=user; await refreshData(); render(); },
-    ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; render(); }
-  );
-
+    setupAuthListener(
+      async(user)=>{ S.user=user; try{ await refreshData(); }catch(e){ console.error('refreshData:',e); } render(); },
+      ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; render(); }
+    );
+  } catch(e){ console.error('init fatal:',e); }
   render();
 })();
