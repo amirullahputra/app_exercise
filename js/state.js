@@ -2,13 +2,15 @@
 // STATE
 // ══════════════════════════════════════════════════════════
 export const S = {
-  layer: 'library',    // 'library' | 'gym' | 'cardio'
-  tab: 0,
+  // Tab structure (no more layers)
+  // 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
+  tab: 1,                       // default ke Builder (cart) supaya user langsung pilih
+  logSubTab: 'gym',             // 'gym' | 'cardio' inside Log tab
   quarterId: 'Q3Q4_2026',
   quarters: [],
   user: null,
 
-  // exercise library (Phase 1)
+  // exercise library (catalog)
   exerciseLibrary: [],
   libFilters: {
     search: '',
@@ -17,6 +19,11 @@ export const S = {
     equipment: 'all',
   },
   libView: 'grid',     // 'grid' | 'map'
+
+  // PROGRAM SELECTIONS — cart per quarter
+  // { 'Q3Q4_2026': [ {exercise_slug, target_value, target_unit, target_note, sort_order}, ... ] }
+  programSel: {},
+  programLoaded: false,
 
   // gym
   gymProgram: [],      // template exercises from DB

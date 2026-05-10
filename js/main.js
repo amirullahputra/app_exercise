@@ -24,33 +24,26 @@ import {
   saveGymSession, saveGymSets, deleteGymSession,
   loadCardioLog, saveCardioEntry, deleteCardioEntry,
   loadExerciseLibrary,
+  loadProgramSelections, addProgramSelection, removeProgramSelection, updateProgramTarget,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
 } from './supabase.js';
 import {
-  GYM_TABS, CARD_TABS,
-  pGymLog, pGymProgression,
-  pCardioLog, pCardioWeekly,
-  pMarkdownContent,
-  pLibrary
+  pOverview, pBuilder, pPlan, pLog, pLibrary
 } from './panels.js';
 
-// ── RENDER ──
-function renderLayerRow(){
-  const layers = [
-    { k:'library', l:'📚 Library' },
-    { k:'gym',     l:'🏋️ Gym' },
-    { k:'cardio',  l:'🏃 Cardio' },
-  ];
-  document.getElementById('layer-row').innerHTML = layers.map(({k,l})=>`
-    <button class="layer-btn ${k}${S.layer===k?' act':''}" onclick="setLayer('${k}')">${l}</button>
-  `).join('');
-}
+// TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
+const TABS = [
+  { i:0, l:'📊 Overview' },
+  { i:1, l:'🛒 Builder' },
+  { i:2, l:'📅 Plan' },
+  { i:3, l:'✏️ Log' },
+  { i:4, l:'📚 Library' },
+];
 
+// ── RENDER ──
 function renderQselRow(){
   const el = document.getElementById('qsel-row');
-  // Library layer = lintas-quarter, sembunyikan quarter selector
-  if(S.layer==='library'){ el.style.display='none'; return; }
   el.style.display='';
   el.innerHTML =
     `<span class="qsel-lbl">Quarter</span>` +
@@ -59,12 +52,9 @@ function renderQselRow(){
 
 function renderTabNav(){
   const el = document.getElementById('tab-nav');
-  // Library = single panel, no tabs
-  if(S.layer==='library'){ el.style.display='none'; return; }
   el.style.display='';
-  const tabs = S.layer==='gym' ? GYM_TABS : CARD_TABS;
-  el.innerHTML = tabs.map((t,i)=>
-    `<button class="tab-btn${S.tab===i?' act':''}" onclick="setTab(${i})">${t}</button>`
+  el.innerHTML = TABS.map(t =>
+    `<button class="tab-btn${S.tab===t.i?' act':''}" onclick="setTab(${t.i})">${t.l}</button>`
   ).join('');
 }
 
@@ -74,22 +64,15 @@ function getContent(docType){
 
 function renderPanel(){
   let html = '';
-  if(S.layer==='library'){
-    html = pLibrary();
-  } else if(S.layer==='gym'){
-    if(S.tab===0)      html = pMarkdownContent('GYM', getContent('GYM'));
-    else if(S.tab===1) html = pGymLog();
-    else               html = pGymProgression();
-  } else {
-    if(S.tab===0)      html = pCardioLog();
-    else if(S.tab===1) html = pCardioWeekly();
-    else               html = pMarkdownContent('CARDIO', getContent('CARDIO'));
-  }
+  if(S.tab===0)      html = pOverview();
+  else if(S.tab===1) html = pBuilder();
+  else if(S.tab===2) html = pPlan();
+  else if(S.tab===3) html = pLog();
+  else               html = pLibrary();
   document.getElementById('panels-root').innerHTML = html;
 }
 
 function render(){
-  renderLayerRow();
   renderQselRow();
   renderTabNav();
   renderPanel();
@@ -97,16 +80,8 @@ function render(){
 window.render = render;
 
 // ── ACTIONS ──
-async function setLayer(l){
-  S.layer = l; S.tab = 0;
-  await loadContent();
-  if(S.user) await refreshData();
-  render();
-}
-window.setLayer = setLayer;
-
 async function setQuarter(qid){
-  S.quarterId = qid; S.tab = 0;
+  S.quarterId = qid;
   await loadContent();
   if(S.user) await refreshData();
   render();
@@ -115,6 +90,8 @@ window.setQuarter = setQuarter;
 
 function setTab(i){ S.tab=i; renderTabNav(); renderPanel(); }
 window.setTab = setTab;
+
+window.setLogSubTab = function(t){ S.logSubTab = t; renderPanel(); };
 
 // ── LOAD CONTENT (public) ──
 async function loadContent(){
@@ -129,9 +106,73 @@ async function loadContent(){
 async function refreshData(){
   if(!S.user) return;
   S.gymProgram  = await loadGymProgram(S.quarterId);
-  if(S.layer==='gym') S.gymSessions = await loadGymSessions(S.user.id, S.quarterId);
-  else                S.cardioLog   = await loadCardioLog(S.user.id, S.quarterId);
+  S.gymSessions = await loadGymSessions(S.user.id, S.quarterId);
+  S.cardioLog   = await loadCardioLog(S.user.id, S.quarterId);
+  try {
+    S.programSel = await loadProgramSelections(S.user.id);
+    S.programLoaded = true;
+  } catch(e){ console.error('loadProgramSelections:', e); }
 }
+
+// ── PROGRAM CART (drag & drop) ──
+window.onDragStart = function(ev, slug){
+  ev.dataTransfer.setData('text/plain', slug);
+  ev.dataTransfer.effectAllowed = 'copy';
+};
+window.onDragOver = function(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.add('drag-over');
+};
+window.onDragLeave = function(ev){ ev.currentTarget.classList.remove('drag-over'); };
+window.onDrop = async function(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  const slug = ev.dataTransfer.getData('text/plain');
+  if(slug) await window.addToProgram(slug);
+};
+
+window.addToProgram = async function(slug){
+  if(!S.user){ alert('Login dulu untuk save program!'); return; }
+  // Skip if already in current quarter
+  const sel = S.programSel[S.quarterId] || [];
+  if(sel.find(s => s.exercise_slug === slug)) return;
+  try {
+    const row = await addProgramSelection(S.user.id, S.quarterId, slug);
+    if(row){
+      if(!S.programSel[S.quarterId]) S.programSel[S.quarterId] = [];
+      S.programSel[S.quarterId].push(row);
+    }
+    renderPanel();
+  } catch(e){ alert('Error: '+(e.message||e)); }
+};
+
+window.removeFromProgram = async function(id){
+  try {
+    await removeProgramSelection(id);
+    Object.keys(S.programSel).forEach(qid => {
+      S.programSel[qid] = (S.programSel[qid]||[]).filter(s => s.id !== id);
+    });
+    renderPanel();
+  } catch(e){ alert('Error: '+(e.message||e)); }
+};
+
+window.updateTarget = async function(id, value, unit, note){
+  try {
+    await updateProgramTarget(id, value, unit, note);
+    Object.keys(S.programSel).forEach(qid => {
+      const s = (S.programSel[qid]||[]).find(x => x.id === id);
+      if(s){ s.target_value = value; s.target_unit = unit; s.target_note = note; }
+    });
+  } catch(e){ alert('Error: '+(e.message||e)); }
+};
+
+window.onTargetBlur = async function(id, field, value){
+  const sel = Object.values(S.programSel).flat().find(s => s.id === id);
+  if(!sel) return;
+  const val = (field==='target_value') ? (parseFloat(value)||null) : value;
+  sel[field] = val;
+  await updateProgramTarget(id, sel.target_value, sel.target_unit, sel.target_note);
+};
 
 // ── GYM DRAFT ──
 window.updateGymDraftMeta = function(){
@@ -277,7 +318,7 @@ function showInitError(msg){
   try {
     setupAuthListener(
       async(user)=>{ S.user=user; try{ await refreshData(); }catch(e){ console.error('refreshData:',e); } render(); },
-      ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; render(); }
+      ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; S.programSel={}; S.programLoaded=false; render(); }
     );
   } catch(e){ errs.push('setupAuthListener: '+(e.message||e)); }
 

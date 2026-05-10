@@ -161,6 +161,46 @@ export async function loadExerciseLibrary(){
   return _exerciseLibrary;
 }
 
+// ── PROGRAM SELECTIONS (cart per quarter) ──
+export async function loadProgramSelections(userId){
+  if(!userId) return {};
+  const { data, error } = await supa.from('exercise_program_selections')
+    .select('id,quarter_id,exercise_slug,target_value,target_unit,target_note,sort_order')
+    .eq('user_id', userId)
+    .order('sort_order');
+  if(error){ console.error('loadProgramSelections:', error); throw error; }
+  // Group by quarter
+  const out = {};
+  (data||[]).forEach(r => {
+    if(!out[r.quarter_id]) out[r.quarter_id] = [];
+    out[r.quarter_id].push(r);
+  });
+  return out;
+}
+
+export async function addProgramSelection(userId, quarterId, slug){
+  const { data, error } = await supa.from('exercise_program_selections').insert({
+    user_id: userId, quarter_id: quarterId, exercise_slug: slug,
+    sort_order: Date.now() % 1000000
+  }).select().single();
+  if(error && error.code !== '23505'){ // ignore duplicate (already in cart)
+    console.error('addProgramSelection:', error); throw error;
+  }
+  return data;
+}
+
+export async function removeProgramSelection(id){
+  const { error } = await supa.from('exercise_program_selections').delete().eq('id', id);
+  if(error){ console.error('removeProgramSelection:', error); throw error; }
+}
+
+export async function updateProgramTarget(id, target_value, target_unit, target_note){
+  const { error } = await supa.from('exercise_program_selections')
+    .update({ target_value, target_unit, target_note, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if(error){ console.error('updateProgramTarget:', error); throw error; }
+}
+
 // ── BODY COMP LOG ──
 export async function loadBodyComp(userId, quarterId){
   const { data } = await supa.from('body_comp_log')

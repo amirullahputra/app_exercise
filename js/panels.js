@@ -3,8 +3,6 @@
 // ══════════════════════════════════════════════════════════
 import { S, rpeColor, fmtDate } from './state.js';
 
-export const GYM_TABS  = ['📖 Protocol','🏋️ Log Sesi','📈 Progression'];
-export const CARD_TABS = ['📝 Log Harian','📊 Weekly','📖 Protocol'];
 
 // ── LIBRARY METADATA ─────────────────────────────────────
 const CAT_META = {
@@ -38,6 +36,215 @@ const EQ_LIST = [
 ];
 
 // ── LIBRARY PANEL ────────────────────────────────────────
+// ── OVERVIEW ──────────────────────────────────────────────
+export function pOverview(){
+  const sel = S.programSel[S.quarterId] || [];
+  const totalSel = sel.length;
+  const sessionsCount = (S.gymSessions||[]).length;
+  const cardioCount = (S.cardioLog||[]).length;
+  const lastSession = (S.gymSessions||[])[0];
+  const lastCardio = (S.cardioLog||[])[0];
+
+  // Group selected by category
+  const byCat = {};
+  sel.forEach(s => {
+    const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+    if(!ex) return;
+    if(!byCat[ex.category]) byCat[ex.category] = 0;
+    byCat[ex.category]++;
+  });
+
+  if(!S.user) return `<div class="card"><div class="empty-state"><div class="empty-ico">🔐</div><div class="empty-txt">Login untuk lihat overview</div></div></div>`;
+
+  return `
+    <div class="ov-grid">
+      <div class="ov-card">
+        <div class="ov-l">Program Quarter Ini</div>
+        <div class="ov-v">${totalSel}<span class="ov-sub"> exercises</span></div>
+        <div class="ov-meta">${Object.entries(byCat).map(([k,v])=>`${k}: ${v}`).join(' · ')||'Belum ada — pilih di Builder'}</div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-l">Sesi Gym (Quarter)</div>
+        <div class="ov-v">${sessionsCount}<span class="ov-sub"> sesi</span></div>
+        <div class="ov-meta">${lastSession ? 'Terakhir: '+fmtDate(lastSession.session_date) : 'Belum ada'}</div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-l">Sesi Cardio (Quarter)</div>
+        <div class="ov-v">${cardioCount}<span class="ov-sub"> sesi</span></div>
+        <div class="ov-meta">${lastCardio ? 'Terakhir: '+fmtDate(lastCardio.logged_date) : 'Belum ada'}</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div style="font-size:13px;font-weight:800;color:var(--t0);margin-bottom:.75rem">🎯 Selected Exercises (Quarter ${S.quarterId.replace('_',' ')})</div>
+      ${totalSel===0
+        ? `<div class="empty-state"><div class="empty-ico">🛒</div><div class="empty-txt">Belum ada exercise dipilih.<br><button class="btn btn-primary" style="margin-top:10px" onclick="setTab(1)">Pilih di Builder →</button></div></div>`
+        : `<div class="ov-sel-list">${sel.map(s => {
+            const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+            if(!ex) return '';
+            return `<div class="ov-sel-item">
+              <span class="ov-sel-name">${ex.name}</span>
+              <span class="ov-sel-cat">${ex.category}</span>
+              <span class="ov-sel-tgt">${s.target_value ? s.target_value+(s.target_unit||'') : '—'}</span>
+            </div>`;
+          }).join('')}</div>`
+      }
+    </div>`;
+}
+
+// ── BUILDER ───────────────────────────────────────────────
+export function pBuilder(){
+  if(!S.user){
+    return `<div class="card"><div class="empty-state"><div class="empty-ico">🔐</div><div class="empty-txt">Login dulu untuk build program. Drag exercise dari Library ke kanan untuk pilih.</div></div></div>`;
+  }
+  const sel = S.programSel[S.quarterId] || [];
+  const selSlugs = new Set(sel.map(s => s.exercise_slug));
+
+  const all = S.exerciseLibrary || [];
+  const f = S.libFilters;
+  const filtered = all.filter(e => {
+    if(f.category !== 'all' && e.category !== f.category) return false;
+    if(f.muscle !== 'all'){
+      const muscles = (e.primary_muscles||[]).concat(e.secondary_muscles||[]);
+      if(!muscles.includes(f.muscle)) return false;
+    }
+    if(f.equipment !== 'all' && e.equipment !== f.equipment) return false;
+    if(f.search){
+      const q = f.search.toLowerCase();
+      if(!e.name.toLowerCase().includes(q) && !(e.subcategory||'').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  return `
+    <div class="bld-bar">
+      <div class="bld-bar-l">
+        <span class="bld-bar-lbl">Quarter:</span>
+        <span class="bld-bar-q">${S.quarterId.replace('_',' ')}</span>
+      </div>
+      <div class="bld-bar-r">
+        <span class="bld-bar-cnt">${sel.length} exercise dipilih</span>
+      </div>
+    </div>
+
+    <div class="bld-2col">
+      <!-- LEFT: LIBRARY -->
+      <div class="bld-side">
+        <div class="bld-side-hdr">
+          📚 Library
+          <input type="search" class="bld-search" placeholder="🔍 cari..." value="${f.search}" oninput="setLibSearch(this.value)">
+        </div>
+        <div class="bld-cat-row">
+          ${['all','compound','isolation','run','bike','swim','mobility','stability'].map(c=>`
+            <button class="bld-chip${f.category===c?' act':''}" onclick="setLibFilter('category','${c}')">${c==='all'?'Semua':c}</button>
+          `).join('')}
+        </div>
+        <div class="bld-list">
+          ${filtered.length===0 ? `<div class="empty-state"><div class="empty-txt" style="font-size:11px">Tidak ada match</div></div>` :
+            filtered.map(e => `
+              <div class="bld-card${selSlugs.has(e.slug)?' selected':''}"
+                   draggable="true"
+                   ondragstart="onDragStart(event,'${e.slug}')"
+                   onclick="addToProgram('${e.slug}')"
+                   title="Klik atau drag ke kanan">
+                <div class="bld-card-cat ${e.category}">${e.category}</div>
+                <div class="bld-card-name">${e.name}</div>
+                <div class="bld-card-meta">${(e.primary_muscles||[]).slice(0,3).map(m=>m.replace(/_/g,' ')).join(' · ')}</div>
+                ${selSlugs.has(e.slug) ? `<div class="bld-card-on">✓ Dipilih</div>` : ''}
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+
+      <!-- RIGHT: SELECTED -->
+      <div class="bld-side bld-drop"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event)">
+        <div class="bld-side-hdr">🛒 Selected for ${S.quarterId.replace('_',' ')}</div>
+        ${sel.length === 0
+          ? `<div class="empty-state" style="padding:2rem 1rem"><div class="empty-ico">📥</div><div class="empty-txt">Drag exercise ke sini.<br><span style="font-size:11px;color:var(--t3)">Atau klik card di kiri.</span></div></div>`
+          : `<div class="bld-sel-list">${sel.map(s => {
+              const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+              if(!ex) return '';
+              const isCardio = ['run','bike','swim'].includes(ex.category);
+              const unitOpts = isCardio ? ['km','min','m']:['kg','reps','rpe'];
+              return `<div class="bld-sel-item">
+                <div class="bld-sel-row1">
+                  <span class="bld-sel-cat-pip ${ex.category}"></span>
+                  <span class="bld-sel-name">${ex.name}</span>
+                  <button class="bld-sel-x" onclick="removeFromProgram(${s.id})" title="Hapus">×</button>
+                </div>
+                <div class="bld-sel-row2">
+                  <input type="number" step="0.5" placeholder="target" class="bld-tgt-val"
+                         value="${s.target_value||''}"
+                         onblur="onTargetBlur(${s.id},'target_value',this.value)">
+                  <select class="bld-tgt-unit" onchange="onTargetBlur(${s.id},'target_unit',this.value)">
+                    <option value="">—</option>
+                    ${unitOpts.map(u=>`<option value="${u}"${s.target_unit===u?' selected':''}>${u}</option>`).join('')}
+                  </select>
+                  <input type="text" placeholder="note (e.g. 5×5 @ RPE 7)" class="bld-tgt-note"
+                         value="${s.target_note||''}"
+                         onblur="onTargetBlur(${s.id},'target_note',this.value)">
+                </div>
+              </div>`;
+            }).join('')}</div>`
+        }
+      </div>
+    </div>`;
+}
+
+// ── PLAN ──────────────────────────────────────────────────
+export function pPlan(){
+  if(!S.user) return `<div class="card"><div class="empty-state"><div class="empty-ico">🔐</div><div class="empty-txt">Login dulu</div></div></div>`;
+  const sel = S.programSel[S.quarterId] || [];
+  if(sel.length === 0) return `<div class="card"><div class="empty-state"><div class="empty-ico">📅</div><div class="empty-txt">Belum ada program. Pilih dulu di Builder tab.</div></div></div>`;
+
+  const q = (S.quarters||[]).find(x => x.quarter_id === S.quarterId);
+  const totalWeeks = q?.total_weeks || 13;
+
+  return `
+    <div class="card">
+      <div style="font-size:13px;font-weight:800;margin-bottom:.5rem">📅 Plan ${S.quarterId.replace('_',' ')} — ${totalWeeks} weeks</div>
+      <div style="font-size:11.5px;color:var(--t2);margin-bottom:1rem">Grid week × exercise (per-week dose editing — coming Phase B)</div>
+      <div style="overflow-x:auto">
+        <table class="plan-tbl">
+          <thead>
+            <tr>
+              <th>Exercise</th>
+              <th>Target</th>
+              ${Array.from({length:totalWeeks}, (_,i)=>`<th>W${i+1}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${sel.map(s => {
+              const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+              if(!ex) return '';
+              const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : '—';
+              return `<tr>
+                <td><b>${ex.name}</b><br><span style="font-size:9.5px;color:var(--t3)">${ex.category}</span></td>
+                <td>${tgt}</td>
+                ${Array.from({length:totalWeeks}, ()=>`<td class="plan-cell">·</td>`).join('')}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── LOG ────────────────────────────────────────────────────
+export function pLog(){
+  const sub = S.logSubTab || 'gym';
+  const tabsHtml = `
+    <div class="log-subtab-row">
+      <button class="log-stab${sub==='gym'?' act':''}" onclick="setLogSubTab('gym')">🏋️ Gym</button>
+      <button class="log-stab${sub==='cardio'?' act':''}" onclick="setLogSubTab('cardio')">🏃 Cardio</button>
+    </div>`;
+  if(sub === 'gym') return tabsHtml + pGymLog();
+  return tabsHtml + pCardioLog();
+}
+
 export function pLibrary(){
   const all = S.exerciseLibrary || [];
   const f = S.libFilters;
