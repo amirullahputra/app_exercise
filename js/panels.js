@@ -42,6 +42,19 @@ export function pLibrary(){
   const all = S.exerciseLibrary || [];
   const f = S.libFilters;
 
+  // DEBUG — hapus setelah fix
+  if(!all.length){
+    return `<div class="card" style="padding:2rem;text-align:center">
+      <div style="font-size:1.5rem;margin-bottom:1rem">🔍 Debug Info</div>
+      <div style="font-size:13px;color:var(--t1)">
+        <b>S.exerciseLibrary:</b> ${JSON.stringify(S.exerciseLibrary)}<br><br>
+        <b>typeof:</b> ${typeof S.exerciseLibrary}<br><br>
+        Ini berarti loadExerciseLibrary() return array kosong.<br>
+        Buka F12 → Console → cari error merah.
+      </div>
+    </div>`;
+  }
+
   const filtered = all.filter(e => {
     if(f.category !== 'all' && e.category !== f.category) return false;
     if(f.muscle !== 'all'){
