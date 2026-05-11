@@ -151,10 +151,11 @@ export async function deleteCardioEntry(id){
 let _exerciseLibrary = null;
 let _exerciseLibraryLoaded = false;
 export async function loadExerciseLibrary(){
-  if(_exerciseLibraryLoaded) return _exerciseLibrary;
+  if(_exerciseLibraryLoaded && _exerciseLibrary?.length) return _exerciseLibrary;
   const { data, error } = await supa.from('exercise_library')
     .select('*')
-    .order('category').order('sort_order');
+    .order('category', { ascending: true })
+    .order('name', { ascending: true });
   if(error){ console.error('loadExerciseLibrary:', error); throw error; }
   _exerciseLibrary = data || [];
   _exerciseLibraryLoaded = true;

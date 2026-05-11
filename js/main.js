@@ -19,6 +19,7 @@ window.addEventListener('unhandledrejection', e => {
 });
 
 import { S, weekFromDate } from './state.js';
+window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
   saveGymSession, saveGymSets, deleteGymSession,
