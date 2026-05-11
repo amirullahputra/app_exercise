@@ -139,13 +139,12 @@ async function maybeSeedBuilder(){
   if(!S.gymProgram?.length) return;
   if(!S.exerciseLibrary?.length) return;
   try {
-    const { inserted, unmatched } = await seedSelectionsFromGymProgram(
+    const { unmatched } = await seedSelectionsFromGymProgram(
       S.user.id, qid, S.gymProgram, S.exerciseLibrary
     );
-    if(inserted.length){
-      S.programSel[qid] = inserted;
-      S.programSeededFromTemplate[qid] = true;
-    }
+    // Always reload from DB — upsert with ignoreDuplicates returns [] for existing rows
+    S.programSel = await loadProgramSelections(S.user.id);
+    if((S.programSel[qid]||[]).length) S.programSeededFromTemplate[qid] = true;
     if(unmatched.length && !S._seedWarnedQuarters[qid]){
       console.warn(`[seedBuilder ${qid}] no library match for:`, unmatched);
       S._seedWarnedQuarters[qid] = true;
