@@ -47,10 +47,48 @@ const TABS = [
 // ── RENDER ──
 function renderQselRow(){
   const el = document.getElementById('qsel-row');
-  el.style.display='';
-  el.innerHTML =
-    `<span class="qsel-lbl">Quarter</span>` +
-    S.quarters.map(q=>`<button class="qsel-btn${S.quarterId===q.quarter_id?' act':''}" onclick="setQuarter('${q.quarter_id}')">${q.quarter_id.replace('_',' ')}</button>`).join('');
+  // Override container styling → grid 4-col, no border/padding (clean wrapper)
+  el.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;background:none;border:none;padding:0;box-shadow:none';
+
+  if(!S.quarters?.length){
+    el.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:10px;grid-column:1/-1">Loading quarters…</div>';
+    return;
+  }
+
+  // Sort chronologically (year asc, semester asc: Q1Q2 before Q3Q4)
+  const yearOf = qid => parseInt(qid.split('_')[1]) || 9999;
+  const semOf  = qid => qid.startsWith('Q1Q2') ? 1 : 2;
+  const sorted = [...S.quarters].sort((a,b) => {
+    const dy = yearOf(a.quarter_id) - yearOf(b.quarter_id);
+    return dy !== 0 ? dy : semOf(a.quarter_id) - semOf(b.quarter_id);
+  });
+  // Show first 4 (semester pertama protokol — 2 tahun pertama)
+  const visible = sorted.slice(0, 4);
+
+  el.innerHTML = visible.map(q => {
+    const sel = S.quarterId === q.quarter_id;
+    const exCount = (S.programSel?.[q.quarter_id] || []).length;
+    const weeks = q.total_weeks || 26;
+    const wRange = q.window_raw || '—';
+    return `<div class="ph-card${sel?' sel-all':''}" onclick="setQuarter('${q.quarter_id}')">
+      <div class="ph-tag" style="color:var(--acc)">
+        <div class="ph-dot" style="background:${exCount>0?'var(--acc)':'var(--t3)'}"></div>
+        ${q.quarter_id.replace('_',' ')}
+      </div>
+      <div class="ph-name">${q.quarter_id.replace('_',' ')}</div>
+      <div class="ph-desc">${weeks} minggu · ${wRange}</div>
+      <div class="ph-grid" style="grid-template-columns:1fr 1fr">
+        <div class="ph-stat">
+          <div class="ph-stat-l">Exercise</div>
+          <div class="ph-stat-v" style="color:${exCount>0?'var(--acc)':'var(--t3)'}">${exCount||'—'}</div>
+        </div>
+        <div class="ph-stat">
+          <div class="ph-stat-l">Phase</div>
+          <div class="ph-stat-v" style="font-size:11px">${q.phase_type||'—'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderTabNav(){
@@ -97,9 +135,14 @@ window.render = render;
 // ── ACTIONS ──
 async function setQuarter(qid){
   S.quarterId = qid;
-  await loadContent();
-  if(S.user) await refreshData();
-  render();
+  render();  // immediate visual feedback (gak nunggu DB async)
+  try {
+    await loadContent();
+    if(S.user) await refreshData();
+    render();  // refresh setelah data terload
+  } catch(e){
+    console.error('setQuarter:', e);
+  }
 }
 window.setQuarter = setQuarter;
 
