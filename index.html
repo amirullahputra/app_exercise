@@ -6,7 +6,7 @@
   <title>Exercise Dashboard — VHM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <style>
     /* ── LAYER TOGGLE ── */
     .layer-row{display:flex;gap:6px;margin-bottom:1rem;background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r2);padding:.5rem;box-shadow:var(--shadow-sm)}
@@ -39,6 +39,14 @@
     .btn-ghost{background:var(--bg2);border:1.5px solid var(--bdr2);color:var(--t1)}
     .btn-ghost:hover{border-color:var(--acc);color:var(--acc)}
     .btn-danger{background:var(--warn-bg);border:1px solid var(--warn-bdr);color:var(--warn)}
+    /* ── LIBRARY TABLE (list view) ── */
+    .lib-tbl-wrap{overflow:auto;max-height:calc(100vh - 280px)}
+    .lib-table{width:100%;border-collapse:collapse;font-family:'Plus Jakarta Sans',sans-serif}
+    .lib-table thead th{position:sticky;top:0;background:var(--bg2);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--t2);padding:8px 10px;text-align:left;border-bottom:2px solid var(--bdr2);z-index:5;white-space:nowrap}
+    .lib-table thead th.c{text-align:center}
+    .lib-table tbody td{padding:8px 10px;vertical-align:top;background:var(--bg1)}
+    .lib-table tbody td.c{text-align:center}
+    .lib-table tbody tr:hover td{background:var(--bg2)}
     /* ── ZONE BADGES ── */
     .bdg-z1{background:var(--f3-bg);color:var(--f3);border:1px solid var(--f3-bdr)}
     .bdg-z2{background:var(--acc-bg);color:var(--acc);border:1px solid var(--acc-bdr)}
@@ -175,9 +183,9 @@
   <div id="panels-root"></div>
 </div>
 
-<div id="app-version" style="position:fixed;bottom:4px;right:8px;font-size:9px;color:#999;opacity:.5;font-family:'JetBrains Mono',monospace;pointer-events:none;z-index:9999">v=7</div>
+<div id="app-version" style="position:fixed;bottom:4px;right:8px;font-size:9px;color:#999;opacity:.5;font-family:'JetBrains Mono',monospace;pointer-events:none;z-index:9999">v=8</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script type="module" src="js/main.js?v=7"></script>
+<script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

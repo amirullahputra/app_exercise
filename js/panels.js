@@ -316,7 +316,26 @@ export function pLibrary(){
   } else if(!filtered.length){
     gridContent = `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
   } else {
-    gridContent = `<div class="lib-grid">${filtered.map(renderLibCard).join('')}</div>`;
+    gridContent = `<div class="card" style="padding:0;overflow:hidden">
+      <div class="tbl-wrap lib-tbl-wrap">
+        <table class="lib-table">
+          <thead><tr>
+            <th style="width:90px">Layer</th>
+            <th style="min-width:180px">Exercise</th>
+            <th style="width:110px">Equipment</th>
+            <th style="min-width:140px">Primary Muscles</th>
+            <th style="width:90px">Difficulty</th>
+            <th class="c" style="width:100px">Sets×Reps<br>/ Duration</th>
+            <th class="c" style="width:70px">RPE<br>/ Zone</th>
+            <th class="c" style="width:55px">Rest</th>
+            <th class="c" style="width:60px">Risk</th>
+            <th style="min-width:220px">Mechanism</th>
+            <th style="min-width:200px">Form Cues</th>
+          </tr></thead>
+          <tbody>${filtered.map(renderLibRow).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
   }
 
   return `
@@ -470,6 +489,51 @@ function buildBmLegend(coverage){
         ${topMuscles}
       </div>
     </div>`;
+}
+
+// ── ROW RENDER (list/table view) ─────────────────────────
+function renderLibRow(e){
+  const meta = CAT_META[e.category] || { label:e.category, icon:'•', color:'t1' };
+  const riskColor = e.power_risk === 'HIGH' ? 'warn' : e.power_risk === 'MED' ? 'f2' : 'f3';
+  const isCardio = ['run','bike','swim'].includes(e.category);
+
+  // Defaults — cardio shows duration+distance, strength shows sets×reps
+  const setsReps = (e.default_sets && e.default_reps) ? `${e.default_sets}×${e.default_reps}` : (e.default_reps || '—');
+  const defCol = isCardio
+    ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px">${e.default_duration_min||'—'}min</div>${e.default_distance_km?`<div style="font-size:9px;color:var(--t3)">${e.default_distance_km}km</div>`:''}`
+    : `<div style="font-family:'JetBrains Mono',monospace;font-size:11px">${setsReps}</div>`;
+
+  const rpeZone = isCardio
+    ? (e.default_zone ? `<span class="bdg bdg-z${e.default_zone.slice(1)}">${e.default_zone}</span>` : '—')
+    : (e.default_rpe ? `<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${e.default_rpe}</span>` : '—');
+
+  const rest = e.default_rest_s ? `${e.default_rest_s}s` : '—';
+
+  const primary = (e.primary_muscles||[]).map(m=>`<span class="lib-musc lib-musc-pri" style="font-size:9px">${m.replace(/_/g,' ')}</span>`).join(' ');
+  const secondaryCount = (e.secondary_muscles||[]).length;
+
+  const mechShort = (e.mechanism||'').length > 90 ? (e.mechanism||'').slice(0,90)+'…' : (e.mechanism||'');
+  const formShort = (e.form_cues||'').length > 80 ? (e.form_cues||'').slice(0,80)+'…' : (e.form_cues||'');
+
+  return `<tr style="font-size:11px;border-bottom:1px solid var(--bdr)">
+    <td><span class="lib-cat-pill chip-${meta.color}" style="font-size:9px;padding:2px 8px">${meta.icon} ${meta.label.toUpperCase()}</span></td>
+    <td>
+      <div style="font-weight:700;color:var(--t0);font-size:12.5px">${e.name}</div>
+      ${e.subcategory ? `<div style="font-size:9.5px;color:var(--t3)">${e.subcategory}</div>` : ''}
+    </td>
+    <td><span style="font-size:10px;color:var(--t2)">${e.equipment||'—'}</span></td>
+    <td>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">${primary}</div>
+      ${secondaryCount>0?`<div style="font-size:9px;color:var(--t3);margin-top:2px">+${secondaryCount} secondary</div>`:''}
+    </td>
+    <td><span style="font-size:10px;color:var(--t2);text-transform:capitalize">${e.difficulty||'—'}</span></td>
+    <td class="c">${defCol}</td>
+    <td class="c">${rpeZone}</td>
+    <td class="c"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t2)">${rest}</span></td>
+    <td class="c">${e.power_risk?`<span class="bdg bdg-${riskColor}" style="font-size:9px">${e.power_risk}</span>`:'—'}</td>
+    <td><div style="font-size:10.5px;color:var(--t1);line-height:1.35" title="${(e.mechanism||'').replace(/"/g,'&quot;')}">${mechShort||'—'}</div></td>
+    <td><div style="font-size:10.5px;color:var(--t1);line-height:1.35" title="${(e.form_cues||'').replace(/"/g,'&quot;')}">${formShort||'—'}</div></td>
+  </tr>`;
 }
 
 function renderLibCard(e){
