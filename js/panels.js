@@ -583,57 +583,30 @@ export function pMarkdownContent(docType, content){
 }
 
 // ── GYM: LOG SESI ────────────────────────────────────────
+function parseTargetNote(note){
+  const m = /(\d+)\s*[×x]\s*(\d+)(?:.*RPE\s*([\d.]+))?/i.exec(note||'');
+  return {
+    sets: m ? parseInt(m[1]) : 3,
+    reps: m ? parseInt(m[2]) : null,
+    rpe:  m && m[3] ? parseFloat(m[3]) : 7
+  };
+}
+
+const CAT_LABEL_ID = {
+  compound:'Compound', isolation:'Isolasi',
+  bike:'Sepeda', run:'Lari', swim:'Renang',
+  mobility:'Mobilitas', stability:'Stabilitas',
+  other:'Lainnya'
+};
+
 export function pGymLog(){
-  const prog = Array.isArray(S.gymProgram) ? S.gymProgram : [];
-  const sel = (S.programSel && S.programSel[S.quarterId]) || [];
-  const selSlugs = new Set(sel.map(s => s.exercise_slug));
+  const qid = S.quarterId;
+  const sel = (S.programSel && S.programSel[qid]) || [];
+  const lib = S.exerciseLibrary || [];
   const today = new Date().toISOString().split('T')[0];
 
-  const blocksHtml = ['A','B','C','D'].map(b => {
-    const exs = prog.filter(e => e.block === b);
-    if(!exs.length) return '';
-    const blockNames = {A:'Lower Body',B:'Upper Body',C:'Standing / Core',D:'Aksesori & Anti-Injury'};
-    return `<div style="margin-bottom:1rem">
-      <div class="card-title"><span class="bdg bdg-acc">Block ${b}</span> ${blockNames[b]}</div>
-      ${exs.map(e => {
-        const sets = S.gymDraft.sets.filter(s => s.exercise===e.exercise);
-        const setCount = e.target_sets || 3;
-        const lib = findLibraryByName(e.exercise);
-        const isActive = !!(lib && selSlugs.has(lib.slug));
-        const statusBadge = isActive
-          ? `<span class="bdg bdg-acc" style="margin-left:6px;font-size:9px">● Program</span>`
-          : `<span class="bdg" style="margin-left:6px;font-size:9px;opacity:.55">○ Template</span>`;
-        const wrapStyle = isActive ? '' : 'opacity:.6';
-        return `<div style="margin-bottom:.75rem;${wrapStyle}">
-          <div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:6px">${e.exercise}${statusBadge}
-            <span style="font-size:10px;font-weight:600;color:var(--t2);margin-left:6px">${e.target_sets}×${e.target_reps} @ RPE ${e.target_rpe}</span>
-          </div>
-          ${Array.from({length:setCount},(_,i)=>{
-            const ex = sets[i]||{};
-            return `<div class="form-row" style="margin-bottom:4px">
-              <div class="form-group" style="min-width:32px"><div class="form-lbl">Set</div>
-                <div style="padding:7px 10px;color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${i+1}</div>
-              </div>
-              <div class="form-group" style="flex:1;min-width:60px"><div class="form-lbl">Reps</div>
-                <input class="form-inp" style="width:100%" type="number" min="1" placeholder="${e.target_reps||'—'}" value="${ex.reps||''}"
-                  oninput="updateDraftSet('${b}','${e.exercise}',${i},'reps',this.value)">
-              </div>
-              <div class="form-group" style="flex:1.5;min-width:70px"><div class="form-lbl">Beban (kg)</div>
-                <input class="form-inp" style="width:100%" type="number" min="0" step="0.5" placeholder="0" value="${ex.weight_kg||''}"
-                  oninput="updateDraftSet('${b}','${e.exercise}',${i},'weight_kg',this.value)">
-              </div>
-              <div class="form-group" style="flex:1;min-width:60px"><div class="form-lbl">RPE</div>
-                <input class="form-inp" style="width:100%" type="number" min="1" max="10" step="0.5" placeholder="${e.target_rpe||7}" value="${ex.rpe||''}"
-                  oninput="updateDraftSet('${b}','${e.exercise}',${i},'rpe',this.value)">
-              </div>
-            </div>`;
-          }).join('')}
-        </div>`;
-      }).join('')}
-    </div>`;
-  }).join('');
-
-  return `
+  // Detail Sesi card — selalu render (independen dari cart)
+  const detailCard = `
     <div class="card" style="margin-bottom:1rem">
       <div class="card-title">📅 Detail Sesi</div>
       <div class="form-row">
@@ -647,17 +620,96 @@ export function pGymLog(){
           <input class="form-inp" type="text" id="gym-notes" placeholder="Opsional..." value="${S.gymDraft.notes}" oninput="updateGymDraftMeta()">
         </div>
       </div>
-    </div>
-    ${prog.length ? `
-    <div class="card" style="margin-bottom:1rem">
-      <div class="card-title">🏋️ Sets & Reps</div>
-      ${blocksHtml}
-      <div style="display:flex;gap:8px;padding-top:.75rem;border-top:1px solid var(--bdr)">
-        <button class="btn btn-gym" onclick="submitGymSession()">💾 Simpan Sesi</button>
-        <button class="btn btn-ghost" onclick="clearGymDraft()">Reset</button>
+    </div>`;
+
+  // Resolve sel → library entries, sort by sort_order
+  const resolved = sel
+    .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
+    .filter(r => r.ex)
+    .sort((a,b) => (a.s.sort_order||0) - (b.s.sort_order||0));
+
+  // Empty state: belum ada exercise di Builder cart
+  if(!resolved.length){
+    const histEmpty = S.gymSessions.length ? `
+      <div class="card">
+        <div class="card-title">🕐 Riwayat Sesi</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Tanggal</th><th>Week</th><th>Durasi</th><th>Notes</th><th></th></tr></thead>
+            <tbody>
+              ${S.gymSessions.slice(0,10).map(s=>`<tr>
+                <td style="font-weight:700">${fmtDate(s.session_date)}</td>
+                <td><span class="bdg bdg-acc">W${s.week_num||'?'}</span></td>
+                <td class="mono">${s.duration_min||'—'} min</td>
+                <td style="color:var(--t2)">${s.notes||''}</td>
+                <td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteSession(${s.id})">Hapus</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : '';
+    return `
+      ${detailCard}
+      <div class="card" style="margin-bottom:1rem">
+        <div class="empty-state">
+          <div class="empty-ico">🛒</div>
+          <div class="empty-txt">Belum ada exercise — pilih di Builder dulu.<br>
+            <button class="btn btn-primary" style="margin-top:10px" onclick="setTab(1)">Buka Builder →</button>
+          </div>
+        </div>
       </div>
-    </div>` : `<div class="card"><div class="empty-state"><div class="empty-ico">📋</div><div class="empty-txt">Lihat tab Protocol untuk program latihan</div></div></div>`}
-    ${S.gymSessions.length ? `
+      ${histEmpty}`;
+  }
+
+  // Group by library.category
+  const byCat = {};
+  resolved.forEach(r => {
+    const cat = r.ex.category || 'other';
+    (byCat[cat] = byCat[cat] || []).push(r);
+  });
+
+  const CAT_RENDER_ORDER = ['compound','isolation','bike','run','swim','mobility','stability','other'];
+  const blocksHtml = CAT_RENDER_ORDER.filter(c => byCat[c]).map(cat => {
+    const meta = CAT_META[cat] || { icon:'📋', color:'acc' };
+    const labelID = CAT_LABEL_ID[cat] || cat;
+    const rows = byCat[cat].map(({ s, ex }) => {
+      const parsed = parseTargetNote(s.target_note);
+      const repsDefault = parsed.reps || s.target_value || '';
+      const targetStr = `${parsed.sets}×${parsed.reps||'?'} @ RPE ${parsed.rpe}`;
+      const draftSets = S.gymDraft.sets.filter(d => d.exercise === ex.name);
+      return `<div style="margin-bottom:.75rem">
+        <div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:6px">${ex.name}
+          <span style="font-size:10px;font-weight:600;color:var(--t2);margin-left:6px">${targetStr}</span>
+        </div>
+        ${Array.from({length:parsed.sets},(_,i)=>{
+          const d = draftSets[i]||{};
+          return `<div class="form-row" style="margin-bottom:4px">
+            <div class="form-group" style="min-width:32px"><div class="form-lbl">Set</div>
+              <div style="padding:7px 10px;color:var(--t3);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${i+1}</div>
+            </div>
+            <div class="form-group" style="flex:1;min-width:60px"><div class="form-lbl">Reps</div>
+              <input class="form-inp" style="width:100%" type="number" min="1" placeholder="${repsDefault||'—'}" value="${d.reps||''}"
+                oninput="updateDraftSet('${cat}','${ex.name.replace(/'/g,"\\'")}',${i},'reps',this.value)">
+            </div>
+            <div class="form-group" style="flex:1.5;min-width:70px"><div class="form-lbl">Beban (kg)</div>
+              <input class="form-inp" style="width:100%" type="number" min="0" step="0.5" placeholder="0" value="${d.weight_kg||''}"
+                oninput="updateDraftSet('${cat}','${ex.name.replace(/'/g,"\\'")}',${i},'weight_kg',this.value)">
+            </div>
+            <div class="form-group" style="flex:1;min-width:60px"><div class="form-lbl">RPE</div>
+              <input class="form-inp" style="width:100%" type="number" min="1" max="10" step="0.5" placeholder="${parsed.rpe}" value="${d.rpe||''}"
+                oninput="updateDraftSet('${cat}','${ex.name.replace(/'/g,"\\'")}',${i},'rpe',this.value)">
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:1rem">
+      <div class="card-title"><span class="bdg bdg-${meta.color}">${meta.icon} ${labelID}</span> <span style="font-size:11px;color:var(--t2);font-weight:600">${byCat[cat].length} exercise</span></div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  const historyHtml = S.gymSessions.length ? `
     <div class="card">
       <div class="card-title">🕐 Riwayat Sesi</div>
       <div class="tbl-wrap">
@@ -674,7 +726,19 @@ export function pGymLog(){
           </tbody>
         </table>
       </div>
-    </div>` : ''}`;
+    </div>` : '';
+
+  return `
+    ${detailCard}
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">🏋️ Sets & Reps</div>
+      ${blocksHtml}
+      <div style="display:flex;gap:8px;padding-top:.75rem;border-top:1px solid var(--bdr)">
+        <button class="btn btn-gym" onclick="submitGymSession()">💾 Simpan Sesi</button>
+        <button class="btn btn-ghost" onclick="clearGymDraft()">Reset</button>
+      </div>
+    </div>
+    ${historyHtml}`;
 }
 
 // ── GYM: PROGRESSION ────────────────────────────────────
