@@ -25,6 +25,7 @@ import {
   saveGymSession, saveGymSets, deleteGymSession,
   loadCardioLog, saveCardioEntry, deleteCardioEntry,
   loadExerciseLibrary,
+  addExerciseLibraryItem,
   loadProgramSelections, addProgramSelection, removeProgramSelection, updateProgramTarget,
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
@@ -330,6 +331,104 @@ window.setLibView = function(view){
   S.libView = view;
   renderPanel();
 };
+
+// ── ADD LIBRARY MODAL ──
+const MUSCLE_OPTIONS = [
+  'chest','back','lats','quads','hamstrings','glutes',
+  'shoulders','rear_delts','biceps','triceps',
+  'core','abs','obliques','calves','forearms',
+  'hips','adductors','rotator_cuff','thoracic_spine'
+];
+let _addLibSelectedMuscles = new Set();
+
+function slugify(s){
+  return (s||'').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60);
+}
+
+window.openAddLibModal = function(){
+  if(!S.user){ alert('Login dulu untuk tambah exercise!'); return; }
+  _addLibSelectedMuscles = new Set();
+  document.getElementById('add-lib-modal').classList.add('open');
+  document.getElementById('al-name').value = '';
+  document.getElementById('al-subcategory').value = '';
+  document.getElementById('al-category').value = 'compound';
+  document.getElementById('al-equipment').value = '';
+  document.getElementById('al-err').textContent = '';
+  document.getElementById('al-slug-preview').textContent = 'slug: —';
+  // Render muscle chips
+  document.getElementById('al-muscles').innerHTML = MUSCLE_OPTIONS.map(m =>
+    `<button class="add-lib-musc-chip" data-muscle="${m}" onclick="toggleAddLibMuscle('${m}')">${m.replace(/_/g,' ')}</button>`
+  ).join('');
+  setTimeout(()=>document.getElementById('al-name').focus(), 50);
+};
+
+window.closeAddLibModal = function(){
+  document.getElementById('add-lib-modal').classList.remove('open');
+};
+
+window.onAddLibNameChange = function(){
+  const name = document.getElementById('al-name').value;
+  const slug = slugify(name);
+  document.getElementById('al-slug-preview').textContent = slug ? `slug: ${slug}` : 'slug: —';
+};
+
+window.toggleAddLibMuscle = function(slug){
+  const btn = document.querySelector(`.add-lib-musc-chip[data-muscle="${slug}"]`);
+  if(_addLibSelectedMuscles.has(slug)){
+    _addLibSelectedMuscles.delete(slug);
+    btn?.classList.remove('sel');
+  } else {
+    _addLibSelectedMuscles.add(slug);
+    btn?.classList.add('sel');
+  }
+};
+
+window.submitAddLib = async function(){
+  const errEl = document.getElementById('al-err');
+  const btn = document.getElementById('al-submit');
+  errEl.textContent = '';
+  const name = document.getElementById('al-name').value.trim();
+  const slug = slugify(name);
+  const category = document.getElementById('al-category').value;
+  const equipment = document.getElementById('al-equipment').value || null;
+  const subcategory = document.getElementById('al-subcategory').value.trim() || null;
+  const muscles = Array.from(_addLibSelectedMuscles);
+
+  if(!name){ errEl.textContent = 'Nama exercise harus diisi.'; return; }
+  if(!slug){ errEl.textContent = 'Nama harus mengandung huruf/angka.'; return; }
+  if(!muscles.length){ errEl.textContent = 'Pilih minimal 1 primary muscle.'; return; }
+
+  // Check duplicate slug
+  if((S.exerciseLibrary||[]).find(e => e.slug === slug)){
+    errEl.textContent = `Slug "${slug}" sudah ada. Ganti nama exercise.`;
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = '⏳ Menyimpan...';
+  try {
+    const newItem = await addExerciseLibraryItem({
+      name, slug, category, equipment, subcategory,
+      primary_muscles: muscles
+    });
+    // Append to local cache + re-render
+    S.exerciseLibrary = [...(S.exerciseLibrary||[]), newItem]
+      .sort((a,b) => (a.category||'').localeCompare(b.category||'') || (a.name||'').localeCompare(b.name||''));
+    closeAddLibModal();
+    render();
+  } catch(e){
+    errEl.textContent = 'Gagal simpan: ' + (e.message || e);
+    if((e.message||'').includes('row-level security')){
+      errEl.textContent += '\n→ RLS policy belum allow user write. Cek SQL.';
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Simpan';
+  }
+};
+
+document.getElementById('add-lib-modal')?.addEventListener('click', e => {
+  if(e.target === e.currentTarget) closeAddLibModal();
+});
 
 window.selectBodyMuscle = function(slug){
   S.libFilters.muscle = slug;

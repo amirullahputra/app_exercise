@@ -6,7 +6,7 @@
   <title>Exercise Dashboard — VHM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=6">
   <style>
     /* ── LAYER TOGGLE ── */
     .layer-row{display:flex;gap:6px;margin-bottom:1rem;background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r2);padding:.5rem;box-shadow:var(--shadow-sm)}
@@ -91,6 +91,68 @@
   </div>
 </div>
 
+<!-- ADD EXERCISE MODAL -->
+<div class="modal-overlay add-lib-modal" id="add-lib-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeAddLibModal()">✕</button>
+    <div class="modal-title">➕ Tambah Exercise</div>
+    <div class="modal-sub">Tambah gerakan baru ke library</div>
+
+    <div class="add-lib-form-grid">
+      <div class="full">
+        <label class="add-lib-label">Nama Exercise *</label>
+        <input class="modal-input" id="al-name" type="text" placeholder="mis. Pendlay Row" oninput="onAddLibNameChange()">
+        <div class="add-lib-slug-preview" id="al-slug-preview">slug: —</div>
+      </div>
+
+      <div>
+        <label class="add-lib-label">Kategori *</label>
+        <select class="add-lib-select" id="al-category">
+          <option value="compound">Compound</option>
+          <option value="isolation">Isolation</option>
+          <option value="run">Run</option>
+          <option value="bike">Bike</option>
+          <option value="swim">Swim</option>
+          <option value="mobility">Mobility</option>
+          <option value="stability">Stability</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="add-lib-label">Equipment</label>
+        <select class="add-lib-select" id="al-equipment">
+          <option value="">— Pilih —</option>
+          <option value="barbell">Barbell</option>
+          <option value="dumbbell">Dumbbell</option>
+          <option value="machine">Machine</option>
+          <option value="cable">Cable</option>
+          <option value="bodyweight">Bodyweight</option>
+          <option value="treadmill">Treadmill</option>
+          <option value="bike">Bike</option>
+          <option value="pool">Pool</option>
+          <option value="band">Band</option>
+        </select>
+      </div>
+
+      <div class="full">
+        <label class="add-lib-label">Primary Muscles * <span style="color:var(--t3);font-weight:600;text-transform:none;letter-spacing:0">(klik untuk pilih, bisa lebih dari satu)</span></label>
+        <div class="add-lib-musc-grid" id="al-muscles"></div>
+      </div>
+
+      <div class="full">
+        <label class="add-lib-label">Subcategory / Variasi (opsional)</label>
+        <input class="modal-input" id="al-subcategory" type="text" placeholder="mis. horizontal pull, hip dominant" style="margin-bottom:0">
+      </div>
+    </div>
+
+    <div class="modal-err" id="al-err"></div>
+    <div class="modal-row">
+      <button class="modal-btn secondary" onclick="closeAddLibModal()">Batal</button>
+      <button class="modal-btn primary" id="al-submit" onclick="submitAddLib()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="topbar-brand">
@@ -113,9 +175,9 @@
   <div id="panels-root"></div>
 </div>
 
-<div id="app-version" style="position:fixed;bottom:4px;right:8px;font-size:9px;color:#999;opacity:.5;font-family:'JetBrains Mono',monospace;pointer-events:none;z-index:9999">v=5</div>
+<div id="app-version" style="position:fixed;bottom:4px;right:8px;font-size:9px;color:#999;opacity:.5;font-family:'JetBrains Mono',monospace;pointer-events:none;z-index:9999">v=6</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script type="module" src="js/main.js?v=5"></script>
+<script type="module" src="js/main.js?v=6"></script>
 </body>
 </html>

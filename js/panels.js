@@ -255,18 +255,11 @@ export function pLibrary(){
   const all = S.exerciseLibrary || [];
   const f = S.libFilters;
 
-  const viewToggle = `
-    <div class="lib-view-toggle">
-      <button class="lib-vtgl${S.libView!=='map'?' act':''}" onclick="setLibView('grid')">📋 Grid</button>
-      <button class="lib-vtgl${S.libView==='map'?' act':''}" onclick="setLibView('map')">🫀 Body Map</button>
-    </div>`;
-
-
   const filtered = all.filter(e => {
     if(f.category !== 'all' && e.category !== f.category) return false;
     if(f.muscle !== 'all'){
-      const all = (e.primary_muscles||[]).concat(e.secondary_muscles||[]);
-      if(!all.includes(f.muscle)) return false;
+      const muscles = (e.primary_muscles||[]).concat(e.secondary_muscles||[]);
+      if(!muscles.includes(f.muscle)) return false;
     }
     if(f.equipment !== 'all' && e.equipment !== f.equipment) return false;
     if(f.search){
@@ -290,6 +283,7 @@ export function pLibrary(){
           value="${f.search}" oninput="setLibSearch(this.value)">
         ${(f.search||f.category!=='all'||f.muscle!=='all'||f.equipment!=='all') ?
           `<button class="lib-reset-btn" onclick="resetLibFilters()">✕ Reset</button>` : ''}
+        <button class="lib-add-btn" onclick="openAddLibModal()" title="Tambah exercise baru ke library">➕ Tambah</button>
       </div>
       <div class="lib-chip-group">
         <span class="lib-chip-lbl">Kategori</span>
@@ -316,20 +310,25 @@ export function pLibrary(){
       <div class="lib-result-count">${filtered.length} dari ${all.length} gerakan</div>
     </div>`;
 
-  if(S.libView === 'map'){
-    return viewToggle + pBodyMap();
-  }
-
+  let gridContent;
   if(!all.length){
-    return viewToggle + filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">📚</div><div class="empty-txt">Library belum ter-load. Pastikan SQL seed (08_insert_exercise_library.sql) sudah dijalankan di Supabase.</div></div></div>`;
+    gridContent = `<div class="card"><div class="empty-state"><div class="empty-ico">📚</div><div class="empty-txt">Library belum ter-load. Pastikan SQL seed (08_insert_exercise_library.sql) sudah dijalankan di Supabase.</div></div></div>`;
+  } else if(!filtered.length){
+    gridContent = `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
+  } else {
+    gridContent = `<div class="lib-grid">${filtered.map(renderLibCard).join('')}</div>`;
   }
 
-  if(!filtered.length){
-    return viewToggle + filterBar + `<div class="card"><div class="empty-state"><div class="empty-ico">🔍</div><div class="empty-txt">Tidak ada gerakan cocok dengan filter.<br><button class="btn btn-ghost" style="margin-top:10px" onclick="resetLibFilters()">Reset Filter</button></div></div></div>`;
-  }
-
-  const grid = `<div class="lib-grid">${filtered.map(renderLibCard).join('')}</div>`;
-  return viewToggle + filterBar + grid;
+  return `
+    <div class="lib-split">
+      <div class="lib-split-main">
+        ${filterBar}
+        ${gridContent}
+      </div>
+      <aside class="lib-split-aside">
+        ${pBodyMap()}
+      </aside>
+    </div>`;
 }
 
 // ── BODY MAP ─────────────────────────────────────────────

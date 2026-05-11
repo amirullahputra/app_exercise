@@ -162,6 +162,20 @@ export async function loadExerciseLibrary(){
   return _exerciseLibrary;
 }
 
+// ── ADD EXERCISE TO LIBRARY (authenticated user) ──
+export async function addExerciseLibraryItem(item){
+  // item: { name, slug, category, primary_muscles[], equipment?, subcategory? }
+  const { data, error } = await supa.from('exercise_library')
+    .insert(item)
+    .select()
+    .single();
+  if(error){ console.error('addExerciseLibraryItem:', error); throw error; }
+  // Reset cache so next loadExerciseLibrary picks up new entry
+  _exerciseLibrary = null;
+  _exerciseLibraryLoaded = false;
+  return data;
+}
+
 // ── PROGRAM SELECTIONS (cart per quarter) ──
 export async function loadProgramSelections(userId){
   if(!userId) return {};
