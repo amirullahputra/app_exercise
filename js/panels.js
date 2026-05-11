@@ -623,9 +623,11 @@ export function pGymLog(){
     </div>`;
 
   // Resolve sel → library entries, sort by sort_order
+  // Skip cardio categories (bike/run/swim) — those belong in Cardio Log
+  const CARDIO_CATS = new Set(['bike','run','swim']);
   const resolved = sel
     .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
-    .filter(r => r.ex)
+    .filter(r => r.ex && !CARDIO_CATS.has(r.ex.category))
     .sort((a,b) => (a.s.sort_order||0) - (b.s.sort_order||0));
 
   // Empty state: belum ada exercise di Builder cart
@@ -648,12 +650,19 @@ export function pGymLog(){
           </table>
         </div>
       </div>` : '';
+    const hasCardioOnly = sel.some(s => {
+      const ex = lib.find(e => e.slug === s.exercise_slug);
+      return ex && CARDIO_CATS.has(ex.category);
+    });
+    const emptyMsg = hasCardioOnly
+      ? `Cart cuma berisi cardio (bike/run/swim) — log di tab <b>Cardio</b>.<br>Tambah strength/mobility di Builder buat log di sini.`
+      : `Belum ada exercise — pilih di Builder dulu.`;
     return `
       ${detailCard}
       <div class="card" style="margin-bottom:1rem">
         <div class="empty-state">
           <div class="empty-ico">🛒</div>
-          <div class="empty-txt">Belum ada exercise — pilih di Builder dulu.<br>
+          <div class="empty-txt">${emptyMsg}<br>
             <button class="btn btn-primary" style="margin-top:10px" onclick="setTab(1)">Buka Builder →</button>
           </div>
         </div>
@@ -757,7 +766,35 @@ export function pCardioLog(){
   const typeOpts = [{v:'incline_walk',l:'Incline Walk'},{v:'run_interval',l:'Run Interval'},{v:'run_long',l:'Run Long'},{v:'bike_long',l:'Bike Long'}];
   const zoneOpts = ['Z1','Z2','Z3','Z4'];
 
+  // Cardio program dari Builder cart (bike/run/swim)
+  const CARDIO_CATS = new Set(['bike','run','swim']);
+  const sel = (S.programSel && S.programSel[S.quarterId]) || [];
+  const lib = S.exerciseLibrary || [];
+  const cardioProgram = sel
+    .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
+    .filter(r => r.ex && CARDIO_CATS.has(r.ex.category))
+    .sort((a,b) => (a.s.sort_order||0) - (b.s.sort_order||0));
+
+  const programCard = cardioProgram.length ? `
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">🎯 Cardio Program (Quarter ${S.quarterId.replace('_',' ')})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+        ${cardioProgram.map(({ s, ex }) => {
+          const icon = ex.category==='bike'?'🚴':ex.category==='run'?'🏃':'🏊';
+          const label = ex.category==='bike'?'Sepeda':ex.category==='run'?'Lari':'Renang';
+          const target = s.target_note || (s.target_value ? `${s.target_value}${s.target_unit||''}` : '');
+          return `<div style="border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;background:var(--bg2)">
+            <div style="font-size:11.5px;font-weight:700;color:var(--t0)">${icon} ${ex.name}</div>
+            <div style="font-size:9.5px;font-weight:700;color:var(--f3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px">${label}</div>
+            ${target ? `<div style="font-size:10.5px;color:var(--t2);margin-top:4px">${target}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:8px;padding-top:8px;border-top:1px solid var(--bdr)">💡 Log session di form bawah. Strava auto-sync menyusul.</div>
+    </div>` : '';
+
   return `
+    ${programCard}
     <div class="card" style="margin-bottom:1rem">
       <div class="card-title">📝 Log Cardio Baru</div>
       <div class="form-row">
