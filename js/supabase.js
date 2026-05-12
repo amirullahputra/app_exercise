@@ -50,28 +50,75 @@ export async function getCurrentUser(){
   return user;
 }
 
-// ── QUARTERS ──
+// ── QUARTERS (derived from master_timeline, aggregated per semester) ──
+// Old `quarters` + `quarter_content` tables di-drop. master_timeline sekarang
+// jadi single source: 20 rows per-quarter (Q1_2026 .. Q4_2030), tiap row
+// punya semester_id (mis. 'Q3Q4_2026') untuk grouping pair.
 let _quarters = null;
 let _quartersLoaded = false;
 export async function loadQuarters(){
   if(_quartersLoaded) return _quarters;
-  const { data, error } = await supa.from('quarters')
-    .select('quarter_id,phase_type,window_raw,total_weeks,bb_start,bb_end,bf_start,bf_end')
-    .order('quarter_id');
+  const { data, error } = await supa.from('master_timeline')
+    .select('period_id,semester_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order')
+    .order('sort_order');
   if(error){ console.error('loadQuarters:', error); throw error; }
-  _quarters = data || [];
+
+  // Aggregate per semester: 2 rows (mis. Q3_2026+Q4_2026 same semester_id) → 1 entry
+  const map = new Map();
+  for(const r of (data || [])){
+    const id = r.semester_id || r.period_id;
+    if(!map.has(id)){
+      map.set(id, {
+        quarter_id: id,
+        bb_start:   r.bb_start_kg,
+        bb_end:     r.bb_end_kg,
+        bf_start:   r.bf_start_pct,
+        bf_end:     r.bf_end_pct,
+        _start:     r.date_start,
+        _end:       r.date_end,
+        _w_start:   r.week_start,
+        _w_end:     r.week_end
+      });
+    } else {
+      // Semester pair: row kedua extend end values
+      const ex = map.get(id);
+      ex.bb_end = r.bb_end_kg ?? ex.bb_end;
+      ex.bf_end = r.bf_end_pct ?? ex.bf_end;
+      ex._end   = r.date_end;
+      ex._w_end = r.week_end ?? ex._w_end;
+    }
+  }
+
+  // Format display fields (replaces dropped semester_window_raw)
+  const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }); };
+  _quarters = [...map.values()].map(q => ({
+    quarter_id:  q.quarter_id,
+    bb_start:    q.bb_start,
+    bb_end:      q.bb_end,
+    bf_start:    q.bf_start,
+    bf_end:      q.bf_end,
+    total_weeks: (q._w_start && q._w_end) ? (q._w_end - q._w_start + 1) : null,
+    window_raw:  (q._start && q._end) ? `${fmtD(q._start)} → ${fmtD(q._end)}` : ''
+  }));
   _quartersLoaded = true;
   return _quarters;
 }
 
-// ── QUARTER CONTENT (markdown dari Roadmap2029) ──
+// ── QUARTER CONTENT (markdown dari master_timeline.content_*_md) ──
+// quarterId bisa semester_id (Q3Q4_2026) atau period_id (Q3_2026); content
+// duplicate antara 2 row dalam 1 semester, jadi LIMIT 1 cukup.
 export async function loadQuarterContent(quarterId, docTypes=['GYM','CARDIO']){
-  const { data } = await supa.from('quarter_content')
-    .select('doc_type,content_md')
-    .eq('quarter_id', quarterId)
-    .in('doc_type', docTypes);
+  const { data, error } = await supa.from('master_timeline')
+    .select('content_target_md,content_peptide_md,content_gym_md,content_cardio_md,content_nutrisi_md,content_vitamin_md')
+    .or(`semester_id.eq.${quarterId},period_id.eq.${quarterId}`)
+    .limit(1)
+    .maybeSingle();
+  if(error || !data) return {};
   const result = {};
-  if(data) data.forEach(r => { result[r.doc_type] = r.content_md; });
+  for(const t of docTypes){
+    const col = `content_${t.toLowerCase()}_md`;
+    if(data[col]) result[t] = data[col];
+  }
   return result;
 }
 

@@ -132,9 +132,33 @@ function render(){
 }
 window.render = render;
 
+// ── QUARTER SYNERGY BRIDGE ──
+// Canonical localStorage key 'vhm.activeQuarter' pakai quarter format (Q3_2026).
+// App ini pakai semester format (Q3Q4_2026), jadi translate via tabel ini.
+const QUARTER_TO_SEMESTER = {
+  'Q1_2026':'Q1Q2_2026','Q2_2026':'Q1Q2_2026',
+  'Q3_2026':'Q3Q4_2026','Q4_2026':'Q3Q4_2026',
+  'Q1_2027':'Q1Q2_2027','Q2_2027':'Q1Q2_2027',
+  'Q3_2027':'Q3Q4_2027','Q4_2027':'Q3Q4_2027',
+  'Q1_2028':'Q1Q2_2028','Q2_2028':'Q1Q2_2028',
+  'Q3_2028':'Q3Q4_2028','Q4_2028':'Q3Q4_2028'
+};
+const SEMESTER_FIRST_QUARTER = {
+  'Q1Q2_2026':'Q1_2026','Q3Q4_2026':'Q3_2026',
+  'Q1Q2_2027':'Q1_2027','Q3Q4_2027':'Q3_2027',
+  'Q1Q2_2028':'Q1_2028','Q3Q4_2028':'Q3_2028'
+};
+function semFromQ(q){ return QUARTER_TO_SEMESTER[q] || q; }
+function firstQOfSem(sem){ return SEMESTER_FIRST_QUARTER[sem] || sem; }
+window.VHM_QUARTER_BRIDGE = { semFromQ, firstQOfSem };
+
 // ── ACTIONS ──
 async function setQuarter(qid){
   S.quarterId = qid;
+  try {
+    localStorage.setItem('vhm.activeSemester', qid);
+    localStorage.setItem('vhm.activeQuarter', firstQOfSem(qid));
+  } catch(e){}
   render();  // immediate visual feedback (gak nunggu DB async)
   try {
     await loadContent();
@@ -145,6 +169,15 @@ async function setQuarter(qid){
   }
 }
 window.setQuarter = setQuarter;
+
+// Cross-app sync: app lain ubah quarter → kita switch ke semester yg cocok
+window.addEventListener('storage', e => {
+  if(e.key !== 'vhm.activeQuarter' || !e.newValue) return;
+  const sem = semFromQ(e.newValue);
+  if(!S.quarters?.some(q => q.quarter_id === sem)) return;
+  if(S.quarterId === sem) return;
+  setQuarter(sem);
+});
 
 function setTab(i){ S.tab=i; renderTabNav(); renderPanel(); }
 window.setTab = setTab;
@@ -486,7 +519,7 @@ function showInitError(msg){
   root.innerHTML = `<div class="card" style="padding:1.25rem 1.5rem;border-left:4px solid var(--warn);background:var(--warn-bg)">
     <div style="font-size:14px;font-weight:800;color:var(--warn);margin-bottom:8px">⚠️ Init Error — App tidak bisa load data</div>
     <div style="font-size:11.5px;color:var(--t1);font-family:'JetBrains Mono',monospace;white-space:pre-wrap;background:var(--bg1);padding:10px;border-radius:6px;border:1px solid var(--bdr)">${msg}</div>
-    <div style="font-size:10.5px;color:var(--t3);margin-top:10px">Buka F12 → Console untuk detail. Pastikan Supabase RLS allow public read untuk tables: quarters, quarter_content, gym_program, exercise_library.</div>
+    <div style="font-size:10.5px;color:var(--t3);margin-top:10px">Buka F12 → Console untuk detail. Pastikan Supabase RLS allow public read untuk tables: master_timeline, gym_program, exercise_library.</div>
   </div>`;
 }
 
@@ -494,7 +527,16 @@ function showInitError(msg){
 (async()=>{
   const errs = [];
   try { S.quarters = await loadQuarters(); } catch(e){ errs.push('loadQuarters: '+(e.message||e)); S.quarters=[]; }
-  if(S.quarters.length) S.quarterId = S.quarters[0].quarter_id;
+  if(S.quarters.length){
+    // Try shared cross-app key first
+    let initSem = null;
+    try {
+      const sharedQ = localStorage.getItem('vhm.activeQuarter');
+      if(sharedQ) initSem = semFromQ(sharedQ);
+    } catch(e){}
+    const found = initSem && S.quarters.find(q => q.quarter_id === initSem);
+    S.quarterId = found ? initSem : S.quarters[0].quarter_id;
+  }
 
   try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ errs.push('loadExerciseLibrary: '+(e.message||e)); S.exerciseLibrary=[]; }
   try { await loadContent(); } catch(e){ errs.push('loadContent: '+(e.message||e)); }
