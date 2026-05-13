@@ -72,9 +72,11 @@ export function updateAuthUI(user){
   const lbl = document.getElementById('auth-user-label');
   const btn = document.getElementById('auth-action-btn');
   const sub = document.getElementById('topbar-sub');
+  const DISPLAY_NAMES = { 'amirullahpw': 'Amirullah Putra Wijaya' };
   if(user){
-    const uname = user.email.split('@')[0];
-    lbl.textContent = '👤 ' + uname;
+    const key = user.email.split('@')[0];
+    const uname = DISPLAY_NAMES[key] || key;
+    lbl.textContent = '👤 ' + key;
     btn.textContent = 'Logout'; btn.classList.add('logout');
     if(sub) sub.textContent = uname + ' · VHM 2026–2029';
   } else {

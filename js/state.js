@@ -4,7 +4,7 @@
 export const S = {
   // Tab structure (no more layers)
   // 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
-  tab: 1,                       // default ke Builder (cart) supaya user langsung pilih
+  tab: 0,                       // default ke Overview
   logSubTab: 'gym',             // 'gym' | 'cardio' inside Log tab
   quarterId: 'Q2_2026',
   quarters: [],
