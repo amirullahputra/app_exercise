@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=18';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=19';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -1133,6 +1133,28 @@ export function pCardioLog(){
     `<option value="${day}" ${d.trainingDay===day?'selected':''}>${day||'🌐 Semua hari (default)'}</option>`
   ).join('');
 
+  // ── STRAVA STATUS CARD ──
+  const sc = S.stravaConnection;
+  const stravaCard = sc
+    ? `<div class="strava-card">
+        <div class="strava-card-icon">🔗</div>
+        <div style="flex:1;min-width:140px">
+          <div class="strava-card-title">Strava Connected · Athlete #${sc.athlete_id}</div>
+          <div class="strava-card-sub">Scope: ${sc.scope||'—'} · Auto-sync via webhook aktif. Klik tombol untuk backfill manual.</div>
+        </div>
+        <button id="btn-strava-sync" class="btn-strava" onclick="triggerStravaSync(7)">🔗 Sync 7 hari</button>
+        <button class="btn-strava-ghost" onclick="triggerStravaSync(30)">Sync 30 hari</button>
+        <button class="btn-strava-ghost" onclick="disconnectStrava()" title="Disconnect Strava">✕</button>
+      </div>`
+    : `<div class="strava-card">
+        <div class="strava-card-icon">🔗</div>
+        <div style="flex:1;min-width:140px">
+          <div class="strava-card-title">Strava Not Connected</div>
+          <div class="strava-card-sub">Konek Strava → activity Run/Ride/Walk auto-sync ke Cardio log.</div>
+        </div>
+        <button class="btn-strava" onclick="connectStrava()">Connect Strava →</button>
+      </div>`;
+
   const programCard = cardioProgram.length ? `
     <div class="card" style="margin-bottom:1rem">
       <div class="card-title">🎯 Cardio Program (Quarter ${S.quarterId.replace('_',' ')})</div>
@@ -1152,6 +1174,7 @@ export function pCardioLog(){
     </div>` : '';
 
   return `
+    ${stravaCard}
     ${programCard}
     <div class="card" style="margin-bottom:1rem">
       <div class="card-title">📝 Log Cardio Baru</div>
@@ -1213,10 +1236,16 @@ export function pCardioLog(){
       <div class="card-title">🕐 Log Terakhir</div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tanggal</th><th>Day</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Source</th><th>Day</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
           <tbody>
-            ${S.cardioLog.slice(0,15).map(r=>`<tr>
+            ${S.cardioLog.slice(0,15).map(r=>{
+              const isStrava = (r.notes||'').startsWith('[Strava]');
+              const sourceCell = isStrava
+                ? `<span class="strava-badge" title="${(r.notes||'').replace(/"/g,'&quot;')}">🔗 Strava</span>`
+                : `<span style="font-size:9.5px;color:var(--t3)">Manual</span>`;
+              return `<tr>
               <td style="font-weight:700">${fmtDate(r.logged_date)}</td>
+              <td>${sourceCell}</td>
               <td><span style="font-size:11px;font-weight:700;color:var(--acc)">${r.training_day||'—'}</span></td>
               <td style="font-size:10.5px;color:var(--t2)">${r.slot||'—'}</td>
               <td>${r.cardio_type||'—'}</td>
@@ -1225,7 +1254,8 @@ export function pCardioLog(){
               <td class="mono">${r.hr_avg||'—'}</td>
               <td><span class="bdg bdg-z${(r.zone||'Z1').slice(1)}">${r.zone||'—'}</span></td>
               <td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteCardio(${r.id})">Hapus</button></td>
-            </tr>`).join('')}
+            </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>

@@ -361,6 +361,30 @@ export async function seedSelectionsFromGymProgram(userId, quarterId, gymProgram
   }
 }
 
+// ── STRAVA INTEGRATION ──
+// Cek apakah user udah konek Strava (strava_tokens row exists)
+export async function getStravaConnection(userId){
+  try {
+    const data = await authFetch('strava_tokens',
+      `select=athlete_id,scope,expires_at,updated_at&user_id=eq.${userId}`);
+    return (data || [])[0] || null;
+  } catch(e){ console.error('getStravaConnection:', e); return null; }
+}
+
+// Trigger manual backfill via webhook /sync endpoint (no auth — service_role internal)
+export async function triggerStravaSync(athleteId, days=7){
+  const res = await fetch(`${SUPA_URL}/functions/v1/strava-webhook/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY },
+    body: JSON.stringify({ athlete_id: athleteId, days })
+  });
+  if(!res.ok){
+    const body = await res.text().catch(()=>'');
+    throw new Error(`Sync failed: HTTP ${res.status} ${body.slice(0,200)}`);
+  }
+  return res.json().catch(()=>({}));
+}
+
 // ── BODY COMP LOG ──
 export async function loadBodyComp(userId, quarterId){
   const { data } = await supa.from('body_comp_log')

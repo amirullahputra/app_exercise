@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=18';
+import { S, weekFromDate } from './state.js?v=19';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -28,12 +28,13 @@ import {
   addExerciseLibraryItem,
   loadProgramSelections, addProgramSelection, removeProgramSelection, updateProgramTarget,
   seedSelectionsFromGymProgram,
+  getStravaConnection, triggerStravaSync as apiTriggerStravaSync,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=18';
+} from './supabase.js?v=19';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=18';
+} from './panels.js?v=19';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -201,6 +202,8 @@ async function refreshData(){
   S.cardioLog   = await loadCardioLog(S.user.id, S.quarterId);
   try { S.gymSetsLog = await loadGymSetsForQuarter(S.user.id, S.quarterId); }
   catch(e){ console.error('loadGymSetsForQuarter:', e); S.gymSetsLog = []; }
+  try { S.stravaConnection = await getStravaConnection(S.user.id); }
+  catch(e){ console.error('getStravaConnection:', e); S.stravaConnection = null; }
   try {
     S.programSel = await loadProgramSelections(S.user.id);
     S.programLoaded = true;
@@ -395,6 +398,68 @@ window.deleteCardio = async function(id){
   await deleteCardioEntry(id);
   S.cardioLog = await loadCardioLog(S.user.id, S.quarterId);
   render();
+};
+
+// ── STRAVA HANDLERS ──
+window.triggerStravaSync = async function(days=7){
+  if(!S.user){ alert('Login dulu'); return; }
+  let conn = S.stravaConnection;
+  if(!conn){
+    conn = await getStravaConnection(S.user.id);
+    S.stravaConnection = conn;
+  }
+  if(!conn){
+    alert('Belum konek Strava. Klik "Connect Strava" dulu di bawah ini.');
+    return;
+  }
+  const btn = document.getElementById('btn-strava-sync');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Syncing...'; }
+  try {
+    const result = await apiTriggerStravaSync(conn.athlete_id, days);
+    S.cardioLog = await loadCardioLog(S.user.id, S.quarterId);
+    render();
+    const cnt = result?.synced ?? result?.count ?? '?';
+    alert(`✅ Strava sync selesai: ${cnt} activity di-import (last ${days} hari).`);
+  } catch(e){
+    alert('Strava sync error: ' + (e.message || e));
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '🔗 Sync Strava'; }
+  }
+};
+
+window.connectStrava = function(){
+  if(!S.user){ alert('Login dulu'); return; }
+  const redirectUri = 'https://guhhoqpvwzzrlwgfugsb.supabase.co/functions/v1/strava-oauth-callback';
+  const url = 'https://www.strava.com/oauth/authorize?' + new URLSearchParams({
+    client_id: '238438',
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    approval_prompt: 'auto',
+    scope: 'read,activity:read_all',
+    state: S.user.id
+  });
+  window.location.href = url;
+};
+
+window.disconnectStrava = async function(){
+  if(!S.user) return;
+  if(!confirm('Disconnect Strava? Activity sync auto akan berhenti, tapi data cardio yang udah masuk tetap ada.')) return;
+  try {
+    // Delete token via authFetch
+    const url = `${supa.supabaseUrl}/rest/v1/strava_tokens?user_id=eq.${S.user.id}`;
+    const jwt = (await supa.auth.getSession())?.data?.session?.access_token;
+    await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        apikey: 'sb_publishable_yu8KTS5mId2hV7kVjScvZA_-geYqKHv',
+        Authorization: `Bearer ${jwt}`,
+        Prefer: 'return=minimal'
+      }
+    });
+    S.stravaConnection = null;
+    render();
+    alert('Strava disconnected.');
+  } catch(e){ alert('Disconnect error: ' + e.message); }
 };
 
 // ── AUTH ──

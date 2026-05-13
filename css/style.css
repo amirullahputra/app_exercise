@@ -296,6 +296,18 @@ input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;height:4px}
 .note-warn{background:var(--warn-bg);border-color:var(--warn-bdr);color:var(--t1)}
 .sep{height:1px;background:var(--bdr);margin:.875rem 0}
 
+/* ── STRAVA BADGE + CARD ── */
+.strava-badge{display:inline-flex;align-items:center;gap:3px;background:#FC4C02;color:#fff;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:8px;letter-spacing:.3px;white-space:nowrap}
+.strava-card{background:linear-gradient(135deg,rgba(252,76,2,.06),rgba(252,76,2,.02));border:1px solid rgba(252,76,2,.2);border-radius:var(--r2);padding:.875rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.strava-card-icon{font-size:22px;background:#FC4C02;color:#fff;width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.strava-card-title{font-size:13px;font-weight:800;color:var(--t0);margin-bottom:2px}
+.strava-card-sub{font-size:10.5px;color:var(--t2)}
+.btn-strava{background:#FC4C02;color:#fff;border:1px solid #FC4C02;padding:7px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
+.btn-strava:hover{background:#E04400}
+.btn-strava:disabled{opacity:.6;cursor:not-allowed}
+.btn-strava-ghost{background:transparent;color:#FC4C02;border:1.5px solid #FC4C02;padding:6px 13px;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;font-family:inherit}
+.btn-strava-ghost:hover{background:#FC4C02;color:#fff}
+
 /* ── NEW LAYOUT CLASSES (replace inline JS grids) ── */
 .qsel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem}
 .today-split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
