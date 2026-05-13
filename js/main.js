@@ -48,8 +48,12 @@ const TABS = [
 // ── RENDER ──
 function renderQselRow(){
   const el = document.getElementById('qsel-row');
-  // Use CSS class (qsel-grid) instead of inline style — biar bisa di-override media query
   el.className = 'qsel-grid';
+
+  if(!S.user){
+    el.innerHTML = '';
+    return;
+  }
 
   if(!S.quarters?.length){
     el.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:10px;grid-column:1/-1">Loading quarters…</div>';
