@@ -32,6 +32,7 @@ export const S = {
   // gym
   gymProgram: [],      // template exercises from DB
   gymSessions: [],     // logged sessions
+  gymSetsLog: [],      // semua sets logged user di quarter ini — untuk progress overload diagram
   gymDraft: {          // active session being entered
     date: '',
     weekNum: 1,

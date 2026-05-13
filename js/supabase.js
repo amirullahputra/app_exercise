@@ -142,6 +142,23 @@ export async function loadGymSets(sessionId){
   return data || [];
 }
 
+// Load semua gym_sets dari semua sesi user di quarter ini — untuk Progress Overload diagram
+export async function loadGymSetsForQuarter(userId, quarterId){
+  const { data } = await supa.from('gym_sets')
+    .select('exercise,weight_kg,reps,rpe,gym_sessions!inner(session_date,week_num,user_id,quarter_id)')
+    .eq('gym_sessions.user_id', userId)
+    .eq('gym_sessions.quarter_id', quarterId);
+  // Flatten: tiap row jadi {exercise, weight_kg, reps, rpe, session_date, week_num}
+  return (data || []).map(r => ({
+    exercise: r.exercise,
+    weight_kg: r.weight_kg,
+    reps: r.reps,
+    rpe: r.rpe,
+    session_date: r.gym_sessions?.session_date,
+    week_num: r.gym_sessions?.week_num,
+  }));
+}
+
 export async function saveGymSession(userId, quarterId, sessionDate, weekNum, durationMin, notes, trainingDay){
   const { data, error } = await supa.from('gym_sessions').insert({
     user_id: userId, quarter_id: quarterId,

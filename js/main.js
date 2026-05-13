@@ -18,10 +18,10 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=15';
+import { S, weekFromDate } from './state.js?v=16';
 window.S = S;  // debug: inspect state from console
 import {
-  supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
+  supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
   saveGymSession, saveGymSets, deleteGymSession,
   loadCardioLog, saveCardioEntry, deleteCardioEntry,
   loadExerciseLibrary,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=15';
+} from './supabase.js?v=16';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=15';
+} from './panels.js?v=16';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -197,6 +197,8 @@ async function refreshData(){
   S.gymProgram  = await loadGymProgram(S.quarterId);
   S.gymSessions = await loadGymSessions(S.user.id, S.quarterId);
   S.cardioLog   = await loadCardioLog(S.user.id, S.quarterId);
+  try { S.gymSetsLog = await loadGymSetsForQuarter(S.user.id, S.quarterId); }
+  catch(e){ console.error('loadGymSetsForQuarter:', e); S.gymSetsLog = []; }
   try {
     S.programSel = await loadProgramSelections(S.user.id);
     S.programLoaded = true;

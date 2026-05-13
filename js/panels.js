@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=15';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=16';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -36,6 +36,91 @@ const EQ_LIST = [
 ];
 
 // ── LIBRARY PANEL ────────────────────────────────────────
+// ── PROGRESS OVERLOAD DIAGRAM ─────────────────────────────
+// Render bar chart per exercise: planned (light) vs realisasi (solid colored)
+function renderProgressOverload(){
+  const sel = S.programSel[S.quarterId] || [];
+  const q = (S.quarters||[]).find(x => x.quarter_id === S.quarterId);
+  const totalWeeks = q?.total_weeks || 13;
+  const sets = S.gymSetsLog || [];
+  const lib = S.exerciseLibrary || [];
+  const CARDIO_CATS = new Set(['bike','run','swim']);
+
+  // Filter strength exercises yang punya start_weight + target_value
+  const eligible = sel
+    .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
+    .filter(r => r.ex && !CARDIO_CATS.has(r.ex.category))
+    .filter(r => r.s.start_weight && r.s.target_value);
+
+  if(eligible.length === 0){
+    return `<div class="card" style="margin-top:1rem">
+      <div style="font-size:13px;font-weight:800;color:var(--t0);margin-bottom:.5rem">📈 Progress Overload — Quarter ${S.quarterId.replace('_',' ')}</div>
+      <div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">
+        Set <b>Start kg</b> + <b>Target</b> di Builder untuk exercise strength → evaluasi planned vs realisasi auto tampil di sini.
+      </div>
+    </div>`;
+  }
+
+  // Per exercise: build week data
+  const exerciseCharts = eligible.map(({ s, ex }) => {
+    const prog = computeProgression(s.start_weight, s.target_value, totalWeeks);
+    // Group actual sets by week_num (cocok exercise.name case-insensitive)
+    const exNameLower = ex.name.toLowerCase();
+    const actualByWeek = new Map();
+    sets.filter(st => (st.exercise||'').toLowerCase() === exNameLower).forEach(st => {
+      const w = st.week_num;
+      if(!w || !st.weight_kg) return;
+      const prev = actualByWeek.get(w) || 0;
+      if(st.weight_kg > prev) actualByWeek.set(w, st.weight_kg);
+    });
+
+    const maxScale = Math.max(s.target_value, ...[...actualByWeek.values()]) * 1.1;
+    const weeks = Array.from({length:totalWeeks}, (_,i) => i+1);
+    const realizedWeeks = [...actualByWeek.keys()].length;
+
+    // Render bars row
+    const barsHtml = weeks.map(w => {
+      const plan = prog[w-1];
+      const actual = actualByWeek.get(w);
+      const planPct = (plan.load / maxScale) * 100;
+      const actualPct = actual ? (actual / maxScale) * 100 : 0;
+      const isDeload = plan.deload;
+      const delta = actual ? (actual - plan.load) : null;
+      const tooltip = `W${w} ${isDeload?'(DELOAD)':''} — Plan: ${plan.load}kg${actual?` · Actual: ${actual}kg (${delta>=0?'+':''}${delta})`:''}`;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0" title="${tooltip}">
+        <div style="position:relative;width:100%;height:80px;display:flex;align-items:flex-end;justify-content:center;gap:2px">
+          <div style="width:42%;height:${planPct}%;background:${isDeload?'rgba(245,158,11,.35)':'rgba(124,58,237,.25)'};border-radius:2px 2px 0 0;border:1px dashed ${isDeload?'var(--f2)':'var(--acc)'}"></div>
+          ${actual ? `<div style="width:42%;height:${actualPct}%;background:${delta>=0?'var(--f3)':'var(--warn)'};border-radius:2px 2px 0 0"></div>` : '<div style="width:42%"></div>'}
+        </div>
+        <div style="font-size:8px;color:var(--t3);font-family:'JetBrains Mono',monospace">W${w}${isDeload?'·':''}</div>
+        <div style="font-size:8px;color:${actual ? (delta>=0?'var(--f3)':'var(--warn)') : 'var(--t3)'};font-family:'JetBrains Mono',monospace;font-weight:700">${actual||'-'}</div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--bdr)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <b style="font-size:13px;color:var(--t0)">${ex.name}</b>
+        <span style="font-size:10.5px;color:var(--t2)">${s.start_weight}kg → ${s.target_value}kg target</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--t3)">Logged: ${realizedWeeks}/${totalWeeks} weeks</span>
+      </div>
+      <div style="display:flex;gap:1px;align-items:flex-end">${barsHtml}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="card" style="margin-top:1rem">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:800;color:var(--t0)">📈 Progress Overload — Q${S.quarterId.replace('_',' ').replace('Q','')}</div>
+      <span style="margin-left:auto;display:flex;gap:12px;font-size:10.5px;color:var(--t2)">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:rgba(124,58,237,.25);border:1px dashed var(--acc);border-radius:2px"></span> Planned</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--f3);border-radius:2px"></span> ≥ Plan</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--warn);border-radius:2px"></span> &lt; Plan</span>
+      </span>
+    </div>
+    ${exerciseCharts}
+    <div style="font-size:10px;color:var(--t3);margin-top:.5rem">Bar planned (dashed outline) vs realisasi (solid). Angka di bawah = max kg per week. Hover bar untuk detail.</div>
+  </div>`;
+}
+
 // ── OVERVIEW ──────────────────────────────────────────────
 export function pOverview(){
   const sel = S.programSel[S.quarterId] || [];
@@ -142,40 +227,40 @@ export function pOverview(){
           </div>`}
     </div>`;
 
+  // ── WEEK SCOPE: hitung sesi minggu ini (Senin-Minggu) + hari ini ──
+  const dow = today.getDay(); // 0=Sun
+  const daysFromMon = dow === 0 ? 6 : dow - 1;
+  const mon = new Date(today); mon.setDate(today.getDate() - daysFromMon);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const monStr = mon.toISOString().slice(0,10);
+  const sunStr = sun.toISOString().slice(0,10);
+  const todayStr = today.toISOString().slice(0,10);
+  const weekGym = (S.gymSessions||[]).filter(s => s.session_date >= monStr && s.session_date <= sunStr);
+  const weekCardio = (S.cardioLog||[]).filter(c => c.logged_date >= monStr && c.logged_date <= sunStr);
+  const todayGymSes = weekGym.filter(s => s.session_date === todayStr);
+  const todayCardioSes = weekCardio.filter(c => c.logged_date === todayStr);
+  const weekRangeLbl = `${mon.toLocaleDateString('id-ID',{day:'numeric',month:'short'})} – ${sun.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}`;
+
   return `
     ${todayCard}
     <div class="ov-grid">
       <div class="ov-card">
-        <div class="ov-l">Program Quarter Ini</div>
-        <div class="ov-v">${totalSel}<span class="ov-sub"> exercises</span></div>
-        <div class="ov-meta">${Object.entries(byCat).map(([k,v])=>`${k}: ${v}`).join(' · ')||'Belum ada — pilih di Builder'}</div>
+        <div class="ov-l">Latihan Hari Ini</div>
+        <div class="ov-v">${todaySel.length}<span class="ov-sub"> exercise</span></div>
+        <div class="ov-meta">${dayShort} · Gym ${todayGym.length} · Cardio ${todayCardio.length}</div>
       </div>
       <div class="ov-card">
-        <div class="ov-l">Sesi Gym (Quarter)</div>
-        <div class="ov-v">${sessionsCount}<span class="ov-sub"> sesi</span></div>
-        <div class="ov-meta">${lastSession ? 'Terakhir: '+fmtDate(lastSession.session_date) : 'Belum ada'}</div>
+        <div class="ov-l">Sesi Gym (Week)</div>
+        <div class="ov-v">${weekGym.length}<span class="ov-sub"> sesi</span></div>
+        <div class="ov-meta">${weekRangeLbl} · Hari ini: ${todayGymSes.length}</div>
       </div>
       <div class="ov-card">
-        <div class="ov-l">Sesi Cardio (Quarter)</div>
-        <div class="ov-v">${cardioCount}<span class="ov-sub"> sesi</span></div>
-        <div class="ov-meta">${lastCardio ? 'Terakhir: '+fmtDate(lastCardio.logged_date) : 'Belum ada'}</div>
+        <div class="ov-l">Sesi Cardio (Week)</div>
+        <div class="ov-v">${weekCardio.length}<span class="ov-sub"> sesi</span></div>
+        <div class="ov-meta">${weekRangeLbl} · Hari ini: ${todayCardioSes.length}</div>
       </div>
     </div>
-    <div class="card" style="margin-top:1rem">
-      <div style="font-size:13px;font-weight:800;color:var(--t0);margin-bottom:.75rem">🎯 Selected Exercises (Quarter ${S.quarterId.replace('_',' ')})</div>
-      ${totalSel===0
-        ? `<div class="empty-state"><div class="empty-ico">🛒</div><div class="empty-txt">Belum ada exercise dipilih.<br><button class="btn btn-primary" style="margin-top:10px" onclick="setTab(1)">Pilih di Builder →</button></div></div>`
-        : `<div class="ov-sel-list">${sel.map(s => {
-            const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
-            if(!ex) return '';
-            return `<div class="ov-sel-item">
-              <span class="ov-sel-name">${ex.name}</span>
-              <span class="ov-sel-cat">${ex.category}</span>
-              <span class="ov-sel-tgt">${s.target_value ? s.target_value+(s.target_unit||'') : '—'}</span>
-            </div>`;
-          }).join('')}</div>`
-      }
-    </div>`;
+    ${renderProgressOverload()}`;
 }
 
 // ── BUILDER ───────────────────────────────────────────────
@@ -932,10 +1017,21 @@ export function pGymLog(){
   const blocksHtml = CAT_RENDER_ORDER.filter(c => byCat[c]).map(cat => {
     const meta = CAT_META[cat] || { icon:'📋', color:'acc' };
     const labelID = CAT_LABEL_ID[cat] || cat;
+    // Compute current week's planned weight from progression (for beban placeholder)
+    const q = (S.quarters||[]).find(x => x.quarter_id === S.quarterId);
+    const totalWeeksQ = q?.total_weeks || 13;
+    const today = new Date();
+    const qStart = q?.date_start ? new Date(q.date_start) : null;
+    const currentWeek = qStart ? Math.max(1, Math.min(totalWeeksQ, Math.floor((today - qStart) / (7*24*3600*1000)) + 1)) : 1;
     const rows = byCat[cat].map(({ s, ex }) => {
       const parsed = parseTargetNote(s.target_note);
-      const repsDefault = parsed.reps || s.target_value || '';
+      // REPS placeholder: cuma dari parsed target_note (jangan ambil target_value yang biasanya KG)
+      const repsDefault = parsed.reps || '';
       const targetStr = `${parsed.sets}×${parsed.reps||'?'} @ RPE ${parsed.rpe}`;
+      // BEBAN (kg) placeholder: dari progression current week, fallback ke start_weight
+      const prog = computeProgression(s.start_weight, s.target_value, totalWeeksQ);
+      const weightHint = prog ? prog[currentWeek-1]?.load : s.start_weight || s.target_value;
+      const weightPlaceholder = weightHint ? String(weightHint) : '0';
       const draftSets = S.gymDraft.sets.filter(d => d.exercise === ex.name);
       return `<div style="margin-bottom:.75rem">
         <div style="font-size:12px;font-weight:700;color:var(--t0);margin-bottom:6px">${ex.name}
@@ -952,7 +1048,7 @@ export function pGymLog(){
                 oninput="updateDraftSet('${cat}','${ex.name.replace(/'/g,"\\'")}',${i},'reps',this.value)">
             </div>
             <div class="form-group" style="flex:1.5;min-width:70px"><div class="form-lbl">Beban (kg)</div>
-              <input class="form-inp" style="width:100%" type="number" min="0" step="0.5" placeholder="0" value="${d.weight_kg||''}"
+              <input class="form-inp" style="width:100%" type="number" min="0" step="0.5" placeholder="${weightPlaceholder}" value="${d.weight_kg||''}"
                 oninput="updateDraftSet('${cat}','${ex.name.replace(/'/g,"\\'")}',${i},'weight_kg',this.value)">
             </div>
             <div class="form-group" style="flex:1;min-width:60px"><div class="form-lbl">RPE</div>
