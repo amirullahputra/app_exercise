@@ -89,6 +89,8 @@ export async function loadQuarters(){
     bb_end:      r.bb_end_kg,
     bf_start:    r.bf_start_pct,
     bf_end:      r.bf_end_pct,
+    date_start:  r.date_start,
+    date_end:    r.date_end,
     total_weeks: (r.week_start && r.week_end) ? (r.week_end - r.week_start + 1) : 13,
     window_raw:  (r.date_start && r.date_end) ? `${fmtD(r.date_start)} → ${fmtD(r.date_end)}` : '',
   }));

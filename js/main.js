@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=12';
+import { S, weekFromDate } from './state.js?v=13';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=12';
+} from './supabase.js?v=13';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=12';
+} from './panels.js?v=13';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -61,8 +61,10 @@ function renderQselRow(){
   const startIdx = Math.max(0, sorted.findIndex(q => q.quarter_id === 'Q2_2026'));
   const visible = sorted.slice(startIdx, startIdx + 4);
 
+  const todayStr = new Date().toISOString().slice(0,10);
   el.innerHTML = visible.map(q => {
     const sel = S.quarterId === q.quarter_id;
+    const isCurrent = q.date_start && q.date_end && q.date_start <= todayStr && todayStr <= q.date_end;
     const exCount = (S.programSel?.[q.quarter_id] || []).length;
     const weeks = q.total_weeks || 26;
     const wRange = q.window_raw || '—';
@@ -70,6 +72,7 @@ function renderQselRow(){
       <div class="ph-tag" style="color:var(--acc)">
         <div class="ph-dot" style="background:${exCount>0?'var(--acc)':'var(--t3)'}"></div>
         ${q.quarter_id.replace('_',' ')}
+        ${isCurrent ? '<span style="font-size:9px;background:var(--f3);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:800">AKTIF</span>' : ''}
       </div>
       <div class="ph-name">${q.quarter_id.replace('_',' ')}</div>
       <div class="ph-desc">${weeks} minggu · ${wRange}</div>
@@ -557,7 +560,13 @@ render();
       if(sharedQ) initSem = semFromQ(sharedQ);
     } catch(e){}
     const found = initSem && S.quarters.find(q => q.quarter_id === initSem);
-    const defaultQ = S.quarters.find(q => q.quarter_id === 'Q2_2026') || S.quarters[0];
+    // Auto-detect quarter berdasarkan tanggal hari ini (date_start <= today <= date_end)
+    const todayStr = new Date().toISOString().slice(0,10);
+    const currentQ = S.quarters.find(q =>
+      q.date_start && q.date_end &&
+      q.date_start <= todayStr && todayStr <= q.date_end
+    );
+    const defaultQ = currentQ || S.quarters.find(q => q.quarter_id === 'Q2_2026') || S.quarters[0];
     S.quarterId = found ? initSem : defaultQ.quarter_id;
   }
   render();  // refresh setelah quarters load

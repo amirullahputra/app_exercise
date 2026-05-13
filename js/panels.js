@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=12';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=13';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
