@@ -194,6 +194,43 @@ export function pOverview(){
       </div>`;
   };
 
+  // ── cardio log data untuk today card ──
+  const _todayStr = today.toISOString().slice(0,10);
+  const _wdow = today.getDay();
+  const _monD = new Date(today); _monD.setDate(today.getDate() - (_wdow === 0 ? 6 : _wdow - 1));
+  const _sunD = new Date(_monD); _sunD.setDate(_monD.getDate() + 6);
+  const _todayCL = (S.cardioLog||[]).filter(c => c.logged_date === _todayStr);
+  const _weekCL  = (S.cardioLog||[]).filter(c => c.logged_date >= _monD.toISOString().slice(0,10) && c.logged_date <= _sunD.toISOString().slice(0,10));
+  const _showCL  = _todayCL.length > 0 ? _todayCL : _weekCL.slice(0, 3);
+  const _ZCLR = { Z1:'#94a3b8', Z2:'var(--f3)', Z3:'#f59e0b', Z4:'var(--warn)' };
+  const _CTICO = { run_long:'🏃', bike_long:'🚴', incline_walk:'🚶', swim:'🏊' };
+  const _cardioRows = _showCL.map(c => {
+    const nm = (c.notes||'').replace(/^\[Strava\]\s*/,'') || c.cardio_type||'Cardio';
+    const zc = _ZCLR[c.zone]||'#94a3b8';
+    const pts = [c.duration_min ? c.duration_min+' min':'', c.distance_km>0 ? c.distance_km+' km':''].filter(Boolean).join(' · ');
+    const bl = c.logged_date===_todayStr ? ';border-left:3px solid var(--f3)':'';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r)'+bl+'">'
+      +'<span style="font-size:15px">'+(_CTICO[c.cardio_type]||'🏃')+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</div>'
+      +(pts ? '<div style="font-size:10px;color:var(--t3);margin-top:1px">'+pts+'</div>' : '')
+      +'</div>'
+      +'<span style="font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:8px;color:'+zc+';border:1px solid '+zc+'">'+( c.zone||'—')+'</span>'
+      +'</div>';
+  }).join('');
+  const _cardioSubLbl = _todayCL.length===0 && _weekCL.length>0
+    ? '<span style="font-size:10px;color:var(--t3);font-weight:600">· week ini</span>' : '';
+  const _cardioBody = _showCL.length===0
+    ? '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.25rem 0;color:var(--t3);text-align:center"><div style="font-size:24px;opacity:.45;margin-bottom:6px">🏃</div><div style="font-size:11.5px;line-height:1.5">Belum ada cardio log<br>minggu ini</div></div>'
+    : '<div style="flex:1;display:flex;flex-direction:column;gap:6px">'+_cardioRows+'</div>';
+  const _cardioSideHtml = '<div style="background:rgba(16,185,129,.04);border:1px solid var(--bdr);border-radius:var(--r2);padding:14px 16px;display:flex;flex-direction:column">'
+    +'<div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:2px solid var(--f3)">'
+    +'<span style="font-size:18px">🏃</span>'
+    +'<span style="font-size:12.5px;font-weight:800;color:var(--f3);text-transform:uppercase;letter-spacing:.5px">CARDIO</span>'
+    +_cardioSubLbl
+    +'<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:#fff;background:var(--f3);padding:2px 9px;border-radius:10px">'+_showCL.length+'</span>'
+    +'</div>'+_cardioBody+'</div>';
+
   const todayCard = `
     <div style="margin-bottom:1.25rem">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem;padding:0 .25rem">
@@ -216,14 +253,7 @@ export function pOverview(){
               emptyLabel: `Belum ada gym exercise<br>untuk hari ${dayShort}`,
               logBtn: { cls: 'btn btn-gym', action: "setLogSubTab('gym');setTab(3)", label: '📝 Log Gym Session →' }
             })}
-            ${renderSide(todayCardio, {
-              icon: '🏃',
-              label: 'Cardio',
-              accent: 'var(--f3)',
-              accentBg: 'rgba(16,185,129,.04)',
-              emptyLabel: `Belum ada cardio exercise<br>untuk hari ${dayShort}`,
-              logBtn: null
-            })}
+            ${_cardioSideHtml}
           </div>`}
     </div>`;
 
