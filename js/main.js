@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=21';
+import { S, weekFromDate } from './state.js?v=22';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -31,10 +31,10 @@ import {
   getStravaConnection, triggerStravaSync as apiTriggerStravaSync,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=21';
+} from './supabase.js?v=22';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=21';
+} from './panels.js?v=22';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -453,31 +453,71 @@ window.connectStrava = function(){
   window.location.href = url;
 };
 
-// Handle callback dari Strava saat redirect balik dengan ?code=... di URL
+// Handle callback dari Strava saat redirect balik dengan ?code=... di URL.
+// CATATAN: state IS the user_id (passed di connectStrava URL), jadi gak butuh S.user
+// yang mungkin belum populate dari auth listener saat fungsi ini jalan.
 async function handleStravaCallback(){
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const state = params.get('state');
+  const scope = params.get('scope') || '';
   if(!code) return;  // bukan callback dari Strava
 
-  // Clear URL params supaya ga re-trigger
+  // Clear URL params supaya ga re-trigger pas refresh
   history.replaceState({}, document.title, window.location.pathname);
 
-  if(!S.user){
-    alert('Strava callback diterima tapi belum login. Login dulu, terus klik Connect Strava lagi.');
-    return;
+  // Auto-copy code ke clipboard biar user tinggal paste di PowerShell
+  let copyStatus = '';
+  try {
+    await navigator.clipboard.writeText(code);
+    copyStatus = '✅ Code sudah ke-copy ke clipboard!\n\n';
+  } catch(_) {
+    copyStatus = '(Copy manual — clipboard akses ditolak)\n\n';
   }
-  // TODO: kirim code ke Supabase Edge function strava-oauth-exchange untuk tukar code -> token
-  // Edge function butuh CLIENT_SECRET yang ga aman di expose di frontend.
-  // Untuk sekarang, alert user supaya tau dapat code (manual exchange via Postman/curl):
+
+  // Build PowerShell command pre-filled supaya tinggal paste
+  const pwsh =
+    '$resp = Invoke-RestMethod -Method POST -Uri "https://www.strava.com/oauth/token" -Body @{\n' +
+    '  client_id = "238438"\n' +
+    '  client_secret = "d1f5dbc49b9c12adc026be4be17d1dd8185766b9"\n' +
+    `  code = "${code}"\n` +
+    '  grant_type = "authorization_code"\n' +
+    '}\n$resp | ConvertTo-Json -Depth 5';
+
   alert(
-    `Strava authorize berhasil!\n\n` +
+    `Strava authorize berhasil! 🎉\n\n` +
+    copyStatus +
     `Code: ${code}\n` +
-    `State (user_id): ${state}\n\n` +
-    `⚠ Token exchange perlu Edge function 'strava-oauth-exchange' yang belum di-deploy. ` +
-    `Untuk sekarang, kasih tau dev untuk exchange code ini ke token + insert ke strava_tokens.`
+    `User ID (state): ${state}\n` +
+    `Scope: ${scope}\n\n` +
+    `LANGKAH SELANJUTNYA:\n` +
+    `1. Buka PowerShell, paste command yang udah ke-print di Console (F12 → Console)\n` +
+    `2. Copy access_token, refresh_token, expires_at, athlete.id dari response\n` +
+    `3. Run SQL INSERT di Supabase (lihat instruksi di chat)`
   );
-  console.log('[Strava callback]', { code, state, scope: params.get('scope') });
+
+  // Print full PowerShell command + SQL template ke console biar tinggal copy
+  console.log('━━━━━━━━━━ STRAVA OAUTH CALLBACK ━━━━━━━━━━');
+  console.log('Code:', code);
+  console.log('State (user_id):', state);
+  console.log('Scope:', scope);
+  console.log('\n--- STEP 2: PowerShell command ---\n');
+  console.log(pwsh);
+  console.log('\n--- STEP 3: SQL template ---\n');
+  console.log(`INSERT INTO strava_tokens (user_id, athlete_id, access_token, refresh_token, expires_at, scope)
+VALUES (
+  '${state}',                       -- user_id (langsung pakai state, ga perlu lookup)
+  <ATHLETE_ID>,                     -- dari response.athlete.id
+  '<ACCESS_TOKEN>',                 -- dari response.access_token
+  '<REFRESH_TOKEN>',                -- dari response.refresh_token
+  <EXPIRES_AT>,                     -- dari response.expires_at (epoch number)
+  '${scope}'
+)
+ON CONFLICT (athlete_id) DO UPDATE
+SET user_id=EXCLUDED.user_id, access_token=EXCLUDED.access_token,
+    refresh_token=EXCLUDED.refresh_token, expires_at=EXCLUDED.expires_at,
+    scope=EXCLUDED.scope, updated_at=NOW();`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
 window.disconnectStrava = async function(){
