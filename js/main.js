@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=22';
+import { S, weekFromDate } from './state.js?v=23';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -31,10 +31,10 @@ import {
   getStravaConnection, triggerStravaSync as apiTriggerStravaSync,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=22';
+} from './supabase.js?v=23';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=22';
+} from './panels.js?v=23';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -466,15 +466,6 @@ async function handleStravaCallback(){
   // Clear URL params supaya ga re-trigger pas refresh
   history.replaceState({}, document.title, window.location.pathname);
 
-  // Auto-copy code ke clipboard biar user tinggal paste di PowerShell
-  let copyStatus = '';
-  try {
-    await navigator.clipboard.writeText(code);
-    copyStatus = '✅ Code sudah ke-copy ke clipboard!\n\n';
-  } catch(_) {
-    copyStatus = '(Copy manual — clipboard akses ditolak)\n\n';
-  }
-
   // Build PowerShell command pre-filled supaya tinggal paste
   const pwsh =
     '$resp = Invoke-RestMethod -Method POST -Uri "https://www.strava.com/oauth/token" -Body @{\n' +
@@ -485,15 +476,17 @@ async function handleStravaCallback(){
     '}\n$resp | ConvertTo-Json -Depth 5';
 
   alert(
-    `Strava authorize berhasil! 🎉\n\n` +
-    copyStatus +
+    `✅ Strava authorize berhasil!\n\n` +
     `Code: ${code}\n` +
     `User ID (state): ${state}\n` +
     `Scope: ${scope}\n\n` +
     `LANGKAH SELANJUTNYA:\n` +
-    `1. Buka PowerShell, paste command yang udah ke-print di Console (F12 → Console)\n` +
-    `2. Copy access_token, refresh_token, expires_at, athlete.id dari response\n` +
-    `3. Run SQL INSERT di Supabase (lihat instruksi di chat)`
+    `1. Buka DevTools Console (F12 → Console tab)\n` +
+    `2. Copy PowerShell command yang udah ke-print di sana\n` +
+    `3. Paste di PowerShell terminal → enter → response JSON\n` +
+    `4. Copy access_token, refresh_token, expires_at, athlete.id\n` +
+    `5. Run SQL INSERT (template ada di Console juga)\n` +
+    `6. Refresh app → harusnya Connected`
   );
 
   // Print full PowerShell command + SQL template ke console biar tinggal copy
@@ -694,6 +687,15 @@ try {
   }
 } catch(_){}
 
+// Register auth listener PALING AWAL — biar Supabase event saat localStorage session
+// restored ke-catch + UI ga tampil "Login" sebentar saat reload page.
+try {
+  setupAuthListener(
+    async(user)=>{ S.user=user; try{ await refreshData(); }catch(e){ console.error('refreshData:',e); } render(); },
+    ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; S.programSel={}; S.programLoaded=false; render(); }
+  );
+} catch(e){ console.error('setupAuthListener:', e); }
+
 // Render skeleton SEKALI di awal — supaya UI tampil cepat meski data masih load
 render();
 
@@ -728,12 +730,7 @@ handleStravaCallback();
   try { S.gymProgram = await loadGymProgram(S.quarterId); } catch(e){ errs.push('loadGymProgram: '+(e.message||e)); S.gymProgram=[]; }
   render();
 
-  try {
-    setupAuthListener(
-      async(user)=>{ S.user=user; try{ await refreshData(); }catch(e){ console.error('refreshData:',e); } render(); },
-      ()=>{ S.user=null; S.gymSessions=[]; S.cardioLog=[]; S.programSel={}; S.programLoaded=false; render(); }
-    );
-  } catch(e){ errs.push('setupAuthListener: '+(e.message||e)); }
+  // setupAuthListener udah di-register di awal — gak perlu duplicate disini
 
   if(errs.length) console.warn('[init errors]', errs);
 })();
