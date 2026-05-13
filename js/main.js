@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=20';
+import { S, weekFromDate } from './state.js?v=21';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -31,10 +31,10 @@ import {
   getStravaConnection, triggerStravaSync as apiTriggerStravaSync,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=20';
+} from './supabase.js?v=21';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=20';
+} from './panels.js?v=21';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -427,9 +427,21 @@ window.triggerStravaSync = async function(days=7){
   }
 };
 
+window.forceCheckStrava = async function(){
+  if(!S.user){ alert('Login dulu'); return; }
+  S.stravaConnection = await getStravaConnection(S.user.id);
+  if(S.stravaConnection){
+    alert(`✅ Strava connected: athlete #${S.stravaConnection.athlete_id}`);
+  } else {
+    alert(`❌ strava_tokens row tidak ditemukan untuk user_id ${S.user.id}.\n\nKemungkinan: user_id di DB beda dengan auth user lo. Run SQL: SELECT user_id, athlete_id FROM strava_tokens; lalu compare dengan ${S.user.id}`);
+  }
+  render();
+};
+
 window.connectStrava = function(){
   if(!S.user){ alert('Login dulu'); return; }
-  const redirectUri = 'https://guhhoqpvwzzrlwgfugsb.supabase.co/functions/v1/strava-oauth-callback';
+  // redirect_uri HARUS match domain di Strava dashboard "Authorization Callback Domain" = amirullahputra.github.io
+  const redirectUri = 'https://amirullahputra.github.io/app_exercise/';
   const url = 'https://www.strava.com/oauth/authorize?' + new URLSearchParams({
     client_id: '238438',
     response_type: 'code',
@@ -440,6 +452,33 @@ window.connectStrava = function(){
   });
   window.location.href = url;
 };
+
+// Handle callback dari Strava saat redirect balik dengan ?code=... di URL
+async function handleStravaCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  if(!code) return;  // bukan callback dari Strava
+
+  // Clear URL params supaya ga re-trigger
+  history.replaceState({}, document.title, window.location.pathname);
+
+  if(!S.user){
+    alert('Strava callback diterima tapi belum login. Login dulu, terus klik Connect Strava lagi.');
+    return;
+  }
+  // TODO: kirim code ke Supabase Edge function strava-oauth-exchange untuk tukar code -> token
+  // Edge function butuh CLIENT_SECRET yang ga aman di expose di frontend.
+  // Untuk sekarang, alert user supaya tau dapat code (manual exchange via Postman/curl):
+  alert(
+    `Strava authorize berhasil!\n\n` +
+    `Code: ${code}\n` +
+    `State (user_id): ${state}\n\n` +
+    `⚠ Token exchange perlu Edge function 'strava-oauth-exchange' yang belum di-deploy. ` +
+    `Untuk sekarang, kasih tau dev untuk exchange code ini ke token + insert ke strava_tokens.`
+  );
+  console.log('[Strava callback]', { code, state, scope: params.get('scope') });
+}
 
 window.disconnectStrava = async function(){
   if(!S.user) return;
@@ -617,6 +656,9 @@ try {
 
 // Render skeleton SEKALI di awal — supaya UI tampil cepat meski data masih load
 render();
+
+// Handle Strava OAuth callback kalau ?code= di URL (setelah user authorize di Strava)
+handleStravaCallback();
 
 (async()=>{
   const errs = [];

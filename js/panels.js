@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=20';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=21';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -1149,9 +1149,10 @@ export function pCardioLog(){
     : `<div class="strava-card">
         <div class="strava-card-icon">🔗</div>
         <div style="flex:1;min-width:140px">
-          <div class="strava-card-title">Strava Not Connected</div>
-          <div class="strava-card-sub">Konek Strava → activity Run/Ride/Walk auto-sync ke Cardio log.</div>
+          <div class="strava-card-title">Strava Not Connected (di frontend)</div>
+          <div class="strava-card-sub">Kalau lo udah konek di Strava dashboard tapi disini bilang "Not Connected", kemungkinan user_id di strava_tokens row mismatch dengan auth user lo. Run SQL diagnostic untuk verify, atau klik Sync untuk force re-check.</div>
         </div>
+        <button class="btn-strava-ghost" onclick="forceCheckStrava()">🔄 Re-check</button>
         <button class="btn-strava" onclick="connectStrava()">Connect Strava →</button>
       </div>`;
 
