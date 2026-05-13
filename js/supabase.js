@@ -71,11 +71,15 @@ export function closeAuthModal(){ document.getElementById('auth-modal').classLis
 export function updateAuthUI(user){
   const lbl = document.getElementById('auth-user-label');
   const btn = document.getElementById('auth-action-btn');
+  const sub = document.getElementById('topbar-sub');
   if(user){
-    lbl.textContent = '👤 ' + (user.email.split('@')[0]);
+    const uname = user.email.split('@')[0];
+    lbl.textContent = '👤 ' + uname;
     btn.textContent = 'Logout'; btn.classList.add('logout');
+    if(sub) sub.textContent = uname + ' · VHM 2026–2029';
   } else {
     lbl.textContent = ''; btn.textContent = 'Login'; btn.classList.remove('logout');
+    if(sub) sub.textContent = 'VHM 2026–2029';
   }
 }
 

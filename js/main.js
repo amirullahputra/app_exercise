@@ -70,6 +70,8 @@ function renderQselRow(){
     const exCount = (S.programSel?.[q.quarter_id] || []).length;
     const weeks = q.total_weeks || 26;
     const wRange = q.window_raw || '—';
+    const cardioCount = sel ? (S.cardioLog||[]).length : '—';
+    const bbTarget = (q.bb_start && q.bb_end) ? `${q.bb_start}→${q.bb_end}kg` : (q.bb_end ? `→${q.bb_end}kg` : '—');
     return `<div class="ph-card${sel?' sel-all':''}" onclick="setQuarter('${q.quarter_id}')">
       <div class="ph-tag" style="color:var(--acc)">
         <div class="ph-dot" style="background:${exCount>0?'var(--acc)':'var(--t3)'}"></div>
@@ -79,14 +81,18 @@ function renderQselRow(){
       </div>
       <div class="ph-name">${q.quarter_id.replace('_',' ')}</div>
       <div class="ph-desc">${weeks} minggu · ${wRange}</div>
-      <div class="ph-grid" style="grid-template-columns:1fr 1fr">
+      <div class="ph-grid" style="grid-template-columns:1fr 1fr 1fr">
         <div class="ph-stat">
-          <div class="ph-stat-l">Exercise</div>
+          <div class="ph-stat-l">Gym</div>
           <div class="ph-stat-v" style="color:${exCount>0?'var(--acc)':'var(--t3)'}">${exCount||'—'}</div>
         </div>
         <div class="ph-stat">
-          <div class="ph-stat-l">Phase</div>
-          <div class="ph-stat-v" style="font-size:11px">${q.phase_type||'—'}</div>
+          <div class="ph-stat-l">Cardio</div>
+          <div class="ph-stat-v" style="color:var(--f3)">${cardioCount}</div>
+        </div>
+        <div class="ph-stat">
+          <div class="ph-stat-l">BB</div>
+          <div class="ph-stat-v" style="font-size:10.5px;color:var(--t1)">${bbTarget}</div>
         </div>
       </div>
     </div>`;
