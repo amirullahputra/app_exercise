@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=16';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=17';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -103,7 +103,7 @@ function renderProgressOverload(){
         <span style="font-size:10.5px;color:var(--t2)">${s.start_weight}kg → ${s.target_value}kg target</span>
         <span style="margin-left:auto;font-size:10px;color:var(--t3)">Logged: ${realizedWeeks}/${totalWeeks} weeks</span>
       </div>
-      <div style="display:flex;gap:1px;align-items:flex-end">${barsHtml}</div>
+      <div class="prog-bars-row">${barsHtml}</div>
     </div>`;
   }).join('');
 
@@ -207,7 +207,7 @@ export function pOverview(){
             <div style="font-size:13px;color:var(--t1);margin-bottom:10px">Belum ada exercise di-set untuk hari <b style="color:var(--t0)">${dayShort}</b>.</div>
             <button class="btn btn-primary" onclick="setTab(1)">Set Hari di Builder →</button>
           </div>`
-        : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        : `<div class="today-split">
             ${renderSide(todayGym, {
               icon: '🏋️',
               label: 'Gym',

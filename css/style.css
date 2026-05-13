@@ -296,6 +296,54 @@ input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;height:4px}
 .note-warn{background:var(--warn-bg);border-color:var(--warn-bdr);color:var(--t1)}
 .sep{height:1px;background:var(--bdr);margin:.875rem 0}
 
+/* ── NEW LAYOUT CLASSES (replace inline JS grids) ── */
+.qsel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem}
+.today-split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.prog-bars-row{display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px}
+.prog-bars-row > div{flex:1 1 0;min-width:0}
+
+/* ── MOBILE-FIRST RESPONSIVE OVERRIDES ── */
+@media(max-width:900px){
+  .qsel-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .today-split{grid-template-columns:1fr;gap:10px}
+}
+@media(max-width:600px){
+  .qsel-grid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .ph-card{padding:.625rem .75rem}
+  .ph-name{font-size:13px}
+  .ph-stat-v{font-size:14px}
+  .ph-desc{font-size:9.5px}
+  .ph-grid{grid-template-columns:1fr 1fr;gap:6px}
+  /* Progress overload: bars jadi fixed-width + scroll horizontal */
+  .prog-bars-row > div{flex:0 0 28px}
+  /* Ov-card lebih compact */
+  .ov-card{padding:.75rem .875rem}
+  .ov-v{font-size:20px}
+  /* Topbar tighter */
+  .topbar-brand{gap:8px}
+  .topbar-ico{width:30px;height:30px;font-size:16px}
+  .topbar-title{font-size:12.5px}
+  .auth-wrap{gap:6px}
+}
+@media(max-width:420px){
+  .qsel-grid{grid-template-columns:1fr 1fr;gap:5px}
+  .ph-card{padding:.5rem .6rem}
+  .ph-tag{font-size:9.5px}
+  .ph-name{font-size:12px}
+  .ph-desc{font-size:9px;line-height:1.35}
+  .ph-grid{grid-template-columns:1fr 1fr;gap:4px}
+  .ph-stat-v{font-size:13px}
+  .ph-stat-l{font-size:8.5px}
+  /* Tab nav lebih kecil di phone */
+  .tab-btn{padding:6px 6px;font-size:10px}
+  /* Card padding */
+  .card{padding:.875rem 1rem}
+  /* Today's split: tetap stack, inner cards compact */
+  .today-split{gap:8px}
+  /* Progress bars: lebih kecil */
+  .prog-bars-row > div{flex:0 0 24px}
+}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1000px){
   .phase-row{grid-template-columns:1fr}

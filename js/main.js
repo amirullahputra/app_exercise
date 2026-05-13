@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=16';
+import { S, weekFromDate } from './state.js?v=17';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=16';
+} from './supabase.js?v=17';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=16';
+} from './panels.js?v=17';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -47,7 +47,8 @@ const TABS = [
 // ── RENDER ──
 function renderQselRow(){
   const el = document.getElementById('qsel-row');
-  el.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;background:none;border:none;padding:0;box-shadow:none';
+  // Use CSS class (qsel-grid) instead of inline style — biar bisa di-override media query
+  el.className = 'qsel-grid';
 
   if(!S.quarters?.length){
     el.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:10px;grid-column:1/-1">Loading quarters…</div>';
