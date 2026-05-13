@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=13';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=14';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -56,7 +56,70 @@ export function pOverview(){
 
   if(!S.user) return `<div class="card"><div class="empty-state"><div class="empty-ico">🔐</div><div class="empty-txt">Login untuk lihat overview</div></div></div>`;
 
+  // ── LATIHAN HARI INI: filter sel by today's day of week ──
+  const today = new Date();
+  const DAY_MAP = ['Min','Sen','Sel','Rab','Kam','Jum','Sab']; // index = getDay()
+  const dayShort = DAY_MAP[today.getDay()];
+  const dayFull = today.toLocaleDateString('id-ID',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const todaySel = sel.filter(s => s.training_day === dayShort);
+  const CARDIO_CATS = new Set(['bike','run','swim']);
+  const todayGym = todaySel.filter(s => {
+    const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+    return ex && !CARDIO_CATS.has(ex.category);
+  });
+  const todayCardio = todaySel.filter(s => {
+    const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+    return ex && CARDIO_CATS.has(ex.category);
+  });
+
+  const todayCard = `
+    <div class="card" style="margin-bottom:1rem;border-left:4px solid var(--acc)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem">
+        <div style="font-size:14px;font-weight:800;color:var(--t0)">💪 Latihan Hari Ini</div>
+        <span style="font-size:11px;color:var(--t2);font-weight:600">${dayFull}</span>
+        <span style="margin-left:auto;font-size:10px;background:var(--acc);color:#fff;padding:2px 10px;border-radius:10px;font-weight:800">${dayShort}</span>
+      </div>
+      ${todaySel.length === 0
+        ? `<div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">
+            Belum ada exercise di-set untuk hari <b>${dayShort}</b>.
+            <br><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="setTab(1)">Set Hari di Builder →</button>
+          </div>`
+        : `<div style="display:grid;grid-template-columns:${todayCardio.length>0&&todayGym.length>0?'1fr 1fr':'1fr'};gap:12px">
+            ${todayGym.length > 0 ? `
+            <div>
+              <div style="font-size:11px;font-weight:800;color:var(--f1);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--bdr)">🏋️ Gym · ${todayGym.length}</div>
+              ${todayGym.map(s => {
+                const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+                if(!ex) return '';
+                const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : (s.target_note||'—');
+                const start = s.start_weight ? `start ${s.start_weight}kg` : '';
+                return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">
+                  <b style="font-size:12.5px;color:var(--t0);flex:1">${ex.name}</b>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--acc)">${tgt}</span>
+                  ${start ? `<span style="font-size:9.5px;color:var(--t3)">${start}</span>` : ''}
+                </div>`;
+              }).join('')}
+              <div style="margin-top:8px"><button class="btn btn-gym" onclick="setLogSubTab('gym');setTab(3)" style="font-size:11px">📝 Log Gym →</button></div>
+            </div>` : ''}
+            ${todayCardio.length > 0 ? `
+            <div>
+              <div style="font-size:11px;font-weight:800;color:var(--f3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--bdr)">🏃 Cardio · ${todayCardio.length}</div>
+              ${todayCardio.map(s => {
+                const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+                if(!ex) return '';
+                const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : (s.target_note||'—');
+                return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">
+                  <b style="font-size:12.5px;color:var(--t0);flex:1">${ex.name}</b>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--f3)">${tgt}</span>
+                </div>`;
+              }).join('')}
+              <div style="margin-top:8px"><button class="btn btn-cardio" onclick="setLogSubTab('cardio');setTab(3)" style="font-size:11px">📝 Log Cardio →</button></div>
+            </div>` : ''}
+          </div>`}
+    </div>`;
+
   return `
+    ${todayCard}
     <div class="ov-grid">
       <div class="ov-card">
         <div class="ov-l">Program Quarter Ini</div>
