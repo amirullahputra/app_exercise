@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=17';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=18';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -929,7 +929,7 @@ export function pGymLog(){
   // Ambil semua training days yang terdaftar di cart (untuk selector)
   const allDays = [...new Set(sel.map(s => s.training_day).filter(Boolean))].sort();
   const dayOpts = ['', ...allDays].map(d =>
-    `<option value="${d}" ${S.gymDraft.trainingDay===d?'selected':''}>${d||'— Semua hari —'}</option>`
+    `<option value="${d}" ${S.gymDraft.trainingDay===d?'selected':''}>${d||'🌐 Semua hari (default)'}</option>`
   ).join('');
 
   // Detail Sesi card — selalu render (independen dari cart)
@@ -1027,7 +1027,9 @@ export function pGymLog(){
       const parsed = parseTargetNote(s.target_note);
       // REPS placeholder: cuma dari parsed target_note (jangan ambil target_value yang biasanya KG)
       const repsDefault = parsed.reps || '';
-      const targetStr = `${parsed.sets}×${parsed.reps||'?'} @ RPE ${parsed.rpe}`;
+      const targetStr = parsed.reps
+        ? `${parsed.sets}×${parsed.reps} @ RPE ${parsed.rpe}`
+        : `${parsed.sets} sets @ RPE ${parsed.rpe}`;
       // BEBAN (kg) placeholder: dari progression current week, fallback ke start_weight
       const prog = computeProgression(s.start_weight, s.target_value, totalWeeksQ);
       const weightHint = prog ? prog[currentWeek-1]?.load : s.start_weight || s.target_value;
@@ -1128,7 +1130,7 @@ export function pCardioLog(){
   // Training day options (unique days dari cardio cart)
   const allDays = [...new Set(cardioAll.map(r => r.s.training_day).filter(Boolean))].sort();
   const dayOpts = ['', ...allDays].map(day =>
-    `<option value="${day}" ${d.trainingDay===day?'selected':''}>${day||'— Semua hari —'}</option>`
+    `<option value="${day}" ${d.trainingDay===day?'selected':''}>${day||'🌐 Semua hari (default)'}</option>`
   ).join('');
 
   const programCard = cardioProgram.length ? `

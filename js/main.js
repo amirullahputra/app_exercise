@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=17';
+import { S, weekFromDate } from './state.js?v=18';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=17';
+} from './supabase.js?v=18';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=17';
+} from './panels.js?v=18';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -65,7 +65,7 @@ function renderQselRow(){
   const todayStr = new Date().toISOString().slice(0,10);
   el.innerHTML = visible.map(q => {
     const sel = S.quarterId === q.quarter_id;
-    const isCurrent = q.date_start && q.date_end && q.date_start <= todayStr && todayStr <= q.date_end;
+    const isToday = q.date_start && q.date_end && q.date_start <= todayStr && todayStr <= q.date_end;
     const exCount = (S.programSel?.[q.quarter_id] || []).length;
     const weeks = q.total_weeks || 26;
     const wRange = q.window_raw || '—';
@@ -73,7 +73,8 @@ function renderQselRow(){
       <div class="ph-tag" style="color:var(--acc)">
         <div class="ph-dot" style="background:${exCount>0?'var(--acc)':'var(--t3)'}"></div>
         ${q.quarter_id.replace('_',' ')}
-        ${isCurrent ? '<span style="font-size:9px;background:var(--f3);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:800">AKTIF</span>' : ''}
+        ${sel ? '<span style="font-size:9px;background:var(--acc);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:800">AKTIF</span>' : ''}
+        ${isToday && !sel ? '<span style="font-size:9px;background:var(--f3);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;font-weight:800" title="Quarter ini berisi tanggal hari ini">HARI INI</span>' : ''}
       </div>
       <div class="ph-name">${q.quarter_id.replace('_',' ')}</div>
       <div class="ph-desc">${weeks} minggu · ${wRange}</div>

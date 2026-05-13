@@ -29,6 +29,41 @@ function withTimeout(promise, ms, label){
   ]);
 }
 
+// ── AUTH FETCH (untuk authed writes — bypass GoTrueClient juga) ──
+// Pattern dari pep_fl: supa.from() with auth bisa hang karena GoTrueClient.
+// Pakai plain fetch + JWT dari localStorage langsung.
+let _jwt = null;
+function readJwtFromStorage(){
+  try {
+    const projectRef = SUPA_URL.match(/https:\/\/([^.]+)/)?.[1];
+    if(!projectRef) return null;
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.access_token || parsed?.[0] || null;
+  } catch(_){ return null; }
+}
+
+async function authFetch(table, query='', opts={}){
+  const jwt = _jwt || readJwtFromStorage();
+  if(!jwt) throw new Error(`${table}: no auth session — login dulu`);
+  const url = `${SUPA_URL}/rest/v1/${table}${query?'?'+query:''}`;
+  const headers = {
+    apikey: SUPA_KEY,
+    Authorization: `Bearer ${jwt}`,
+    'Content-Type': 'application/json',
+    ...(opts.headers || {})
+  };
+  const res = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body });
+  if(!res.ok){
+    const body = await res.text().catch(()=>'');
+    throw new Error(`${table}: HTTP ${res.status} ${body.slice(0,300)}`);
+  }
+  if(res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
 // ── AUTH ──
 export function openAuthModal(){ document.getElementById('auth-modal').classList.add('open'); }
 export function closeAuthModal(){ document.getElementById('auth-modal').classList.remove('open'); document.getElementById('auth-err').textContent=''; }
@@ -63,6 +98,8 @@ export async function doLogin(){
 
 export function setupAuthListener(onLogin, onLogout){
   supa.auth.onAuthStateChange(async (event, session) => {
+    if(session?.access_token) _jwt = session.access_token;
+    else _jwt = null;
     updateAuthUI(session?.user || null);
     if(session?.user) await onLogin(session.user);
     else onLogout();
@@ -80,7 +117,7 @@ let _quartersLoaded = false;
 export async function loadQuarters(){
   if(_quartersLoaded) return _quarters;
   const data = await restFetch('master_timeline',
-    'select=period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order&order=sort_order.asc');
+    'select=period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,phase_type,sort_order&order=sort_order.asc');
 
   const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }); };
   _quarters = (data || []).filter(r => r.period_id).map(r => ({
@@ -91,6 +128,7 @@ export async function loadQuarters(){
     bf_end:      r.bf_end_pct,
     date_start:  r.date_start,
     date_end:    r.date_end,
+    phase_type:  r.phase_type || null,
     total_weeks: (r.week_start && r.week_end) ? (r.week_end - r.week_start + 1) : 13,
     window_raw:  (r.date_start && r.date_end) ? `${fmtD(r.date_start)} → ${fmtD(r.date_end)}` : '',
   }));
@@ -125,49 +163,52 @@ export async function loadGymProgram(quarterId){
   } catch(e){ console.error('loadGymProgram:', e); return []; }
 }
 
-// ── GYM SESSIONS ──
+// ── GYM SESSIONS (authFetch — bypass GoTrueClient hang) ──
 export async function loadGymSessions(userId, quarterId){
-  const { data } = await supa.from('gym_sessions')
-    .select('id,session_date,week_num,duration_min,notes,training_day')
-    .eq('user_id', userId).eq('quarter_id', quarterId)
-    .order('session_date', { ascending: false });
-  return data || [];
+  try {
+    const data = await authFetch('gym_sessions',
+      `select=id,session_date,week_num,duration_min,notes,training_day&user_id=eq.${userId}&quarter_id=eq.${quarterId}&order=session_date.desc`);
+    return data || [];
+  } catch(e){ console.error('loadGymSessions:', e); return []; }
 }
 
 export async function loadGymSets(sessionId){
-  const { data } = await supa.from('gym_sets')
-    .select('id,block,exercise,set_num,reps,weight_kg,rpe,notes')
-    .eq('session_id', sessionId)
-    .order('block').order('set_num');
-  return data || [];
+  try {
+    const data = await authFetch('gym_sets',
+      `select=id,block,exercise,set_num,reps,weight_kg,rpe,notes&session_id=eq.${sessionId}&order=block.asc,set_num.asc`);
+    return data || [];
+  } catch(e){ console.error('loadGymSets:', e); return []; }
 }
 
-// Load semua gym_sets dari semua sesi user di quarter ini — untuk Progress Overload diagram
+// Load semua gym_sets di quarter — pakai authFetch + embedded inner join
 export async function loadGymSetsForQuarter(userId, quarterId){
-  const { data } = await supa.from('gym_sets')
-    .select('exercise,weight_kg,reps,rpe,gym_sessions!inner(session_date,week_num,user_id,quarter_id)')
-    .eq('gym_sessions.user_id', userId)
-    .eq('gym_sessions.quarter_id', quarterId);
-  // Flatten: tiap row jadi {exercise, weight_kg, reps, rpe, session_date, week_num}
-  return (data || []).map(r => ({
-    exercise: r.exercise,
-    weight_kg: r.weight_kg,
-    reps: r.reps,
-    rpe: r.rpe,
-    session_date: r.gym_sessions?.session_date,
-    week_num: r.gym_sessions?.week_num,
-  }));
+  try {
+    const data = await authFetch('gym_sets',
+      `select=exercise,weight_kg,reps,rpe,gym_sessions!inner(session_date,week_num,user_id,quarter_id)&gym_sessions.user_id=eq.${userId}&gym_sessions.quarter_id=eq.${quarterId}`);
+    return (data || []).map(r => ({
+      exercise: r.exercise,
+      weight_kg: r.weight_kg,
+      reps: r.reps,
+      rpe: r.rpe,
+      session_date: r.gym_sessions?.session_date,
+      week_num: r.gym_sessions?.week_num,
+    }));
+  } catch(e){ console.error('loadGymSetsForQuarter:', e); return []; }
 }
 
 export async function saveGymSession(userId, quarterId, sessionDate, weekNum, durationMin, notes, trainingDay){
-  const { data, error } = await supa.from('gym_sessions').insert({
-    user_id: userId, quarter_id: quarterId,
-    session_date: sessionDate, week_num: weekNum,
-    duration_min: durationMin, notes: notes || null,
-    training_day: trainingDay || null,
-  }).select().single();
-  if(error) throw error;
-  return data;
+  const data = await authFetch('gym_sessions', '', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      user_id: userId, quarter_id: quarterId,
+      session_date: sessionDate, week_num: weekNum,
+      duration_min: durationMin, notes: notes || null,
+      training_day: trainingDay || null,
+    })
+  });
+  if(!Array.isArray(data) || data.length === 0) throw new Error('gym_sessions: insert returned empty (RLS?)');
+  return data[0];
 }
 
 export async function saveGymSets(sessionId, sets){
@@ -177,33 +218,42 @@ export async function saveGymSets(sessionId, sets){
     set_num: s.set_num || i+1, reps: s.reps, weight_kg: s.weight_kg,
     rpe: s.rpe, notes: s.notes || null
   }));
-  const { error } = await supa.from('gym_sets').insert(rows);
-  if(error) throw error;
+  await authFetch('gym_sets', '', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(rows)
+  });
 }
 
 export async function deleteGymSession(sessionId){
-  await supa.from('gym_sessions').delete().eq('id', sessionId);
+  await authFetch('gym_sessions', `id=eq.${sessionId}`, {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' }
+  });
 }
 
-// ── CARDIO LOG ──
+// ── CARDIO LOG (authFetch) ──
 export async function loadCardioLog(userId, quarterId){
-  const { data } = await supa.from('cardio_log')
-    .select('id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes,training_day')
-    .eq('user_id', userId).eq('quarter_id', quarterId)
-    .order('logged_date', { ascending: false });
-  return data || [];
+  try {
+    const data = await authFetch('cardio_log',
+      `select=id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes,training_day&user_id=eq.${userId}&quarter_id=eq.${quarterId}&order=logged_date.desc`);
+    return data || [];
+  } catch(e){ console.error('loadCardioLog:', e); return []; }
 }
 
 export async function saveCardioEntry(userId, quarterId, entry){
-  const { data, error } = await supa.from('cardio_log').insert({
-    user_id: userId, quarter_id: quarterId, ...entry
-  }).select().single();
-  if(error) throw error;
-  return data;
+  const data = await authFetch('cardio_log', '', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ user_id: userId, quarter_id: quarterId, ...entry })
+  });
+  if(!Array.isArray(data) || data.length === 0) throw new Error('cardio_log: insert returned empty (RLS?)');
+  return data[0];
 }
 
 export async function deleteCardioEntry(id){
-  await supa.from('cardio_log').delete().eq('id', id);
+  await authFetch('cardio_log', `id=eq.${id}`, {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' }
+  });
 }
 
 // ── EXERCISE LIBRARY (public read, restFetch bypass) ──
@@ -218,58 +268,63 @@ export async function loadExerciseLibrary(){
   return _exerciseLibrary;
 }
 
-// ── ADD EXERCISE TO LIBRARY (authenticated user) ──
+// ── ADD EXERCISE TO LIBRARY (authFetch) ──
 export async function addExerciseLibraryItem(item){
-  // item: { name, slug, category, primary_muscles[], equipment?, subcategory? }
-  const { data, error } = await supa.from('exercise_library')
-    .insert(item)
-    .select()
-    .single();
-  if(error){ console.error('addExerciseLibraryItem:', error); throw error; }
-  // Reset cache so next loadExerciseLibrary picks up new entry
+  const data = await authFetch('exercise_library', '', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(item)
+  });
+  if(!Array.isArray(data) || data.length === 0) throw new Error('exercise_library: insert returned empty (RLS?)');
   _exerciseLibrary = null;
   _exerciseLibraryLoaded = false;
-  return data;
+  return data[0];
 }
 
-// ── PROGRAM SELECTIONS (cart per quarter) ──
+// ── PROGRAM SELECTIONS (authFetch) ──
 export async function loadProgramSelections(userId){
   if(!userId) return {};
-  const { data, error } = await supa.from('exercise_program_selections')
-    .select('id,quarter_id,exercise_slug,target_value,target_unit,target_note,sort_order,training_day,start_weight')
-    .eq('user_id', userId)
-    .order('sort_order');
-  if(error){ console.error('loadProgramSelections:', error); throw error; }
-  // Group by quarter
-  const out = {};
-  (data||[]).forEach(r => {
-    if(!out[r.quarter_id]) out[r.quarter_id] = [];
-    out[r.quarter_id].push(r);
-  });
-  return out;
+  try {
+    const data = await authFetch('exercise_program_selections',
+      `select=id,quarter_id,exercise_slug,target_value,target_unit,target_note,sort_order,training_day,start_weight&user_id=eq.${userId}&order=sort_order.asc`);
+    const out = {};
+    (data||[]).forEach(r => {
+      if(!out[r.quarter_id]) out[r.quarter_id] = [];
+      out[r.quarter_id].push(r);
+    });
+    return out;
+  } catch(e){ console.error('loadProgramSelections:', e); return {}; }
 }
 
 export async function addProgramSelection(userId, quarterId, slug){
-  const { data, error } = await supa.from('exercise_program_selections').insert({
-    user_id: userId, quarter_id: quarterId, exercise_slug: slug,
-    sort_order: Date.now() % 1000000
-  }).select().single();
-  if(error && error.code !== '23505'){ // ignore duplicate (already in cart)
-    console.error('addProgramSelection:', error); throw error;
+  try {
+    const data = await authFetch('exercise_program_selections', '', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        user_id: userId, quarter_id: quarterId, exercise_slug: slug,
+        sort_order: Date.now() % 1000000
+      })
+    });
+    return Array.isArray(data) ? data[0] : data;
+  } catch(e){
+    if((e.message||'').includes('23505')) return null;  // duplicate
+    console.error('addProgramSelection:', e); throw e;
   }
-  return data;
 }
 
 export async function removeProgramSelection(id){
-  const { error } = await supa.from('exercise_program_selections').delete().eq('id', id);
-  if(error){ console.error('removeProgramSelection:', error); throw error; }
+  await authFetch('exercise_program_selections', `id=eq.${id}`, {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' }
+  });
 }
 
 export async function updateProgramTarget(id, target_value, target_unit, target_note, extras={}){
-  const { error } = await supa.from('exercise_program_selections')
-    .update({ target_value, target_unit, target_note, ...extras, updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if(error){ console.error('updateProgramTarget:', error); throw error; }
+  await authFetch('exercise_program_selections', `id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ target_value, target_unit, target_note, ...extras, updated_at: new Date().toISOString() })
+  });
 }
 
 // Seed exercise_program_selections from gym_program template for a quarter.
@@ -292,14 +347,18 @@ export async function seedSelectionsFromGymProgram(userId, quarterId, gymProgram
     };
   }).filter(Boolean);
   if(!rows.length) return { inserted: [], unmatched };
-  const { data, error } = await supa.from('exercise_program_selections')
-    .upsert(rows, { onConflict: 'user_id,quarter_id,exercise_slug', ignoreDuplicates: true })
-    .select();
-  if(error && error.code !== '23505'){
-    console.error('seedSelectionsFromGymProgram:', error);
-    throw error;
+  try {
+    const data = await authFetch('exercise_program_selections', 'on_conflict=user_id,quarter_id,exercise_slug', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify(rows)
+    });
+    return { inserted: data || [], unmatched };
+  } catch(e){
+    if((e.message||'').includes('23505')) return { inserted: [], unmatched };
+    console.error('seedSelectionsFromGymProgram:', e);
+    throw e;
   }
-  return { inserted: data || [], unmatched };
 }
 
 // ── BODY COMP LOG ──
