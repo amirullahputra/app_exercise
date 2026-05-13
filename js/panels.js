@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=14';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=15';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -72,49 +72,73 @@ export function pOverview(){
     return ex && CARDIO_CATS.has(ex.category);
   });
 
+  // Helper: render satu side (Gym/Cardio) dengan accent color
+  const renderSide = (items, opts) => {
+    const { icon, label, accent, accentBg, emptyLabel, logBtn } = opts;
+    return `
+      <div style="background:${accentBg};border:1px solid var(--bdr);border-radius:var(--r2);padding:14px 16px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:2px solid ${accent}">
+          <span style="font-size:18px">${icon}</span>
+          <span style="font-size:12.5px;font-weight:800;color:${accent};text-transform:uppercase;letter-spacing:.5px">${label}</span>
+          <span style="margin-left:auto;font-size:10.5px;font-weight:800;color:#fff;background:${accent};padding:2px 9px;border-radius:10px">${items.length}</span>
+        </div>
+        ${items.length === 0
+          ? `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.25rem 0;color:var(--t3);text-align:center">
+              <div style="font-size:24px;opacity:.45;margin-bottom:6px">${icon}</div>
+              <div style="font-size:11.5px;line-height:1.5">${emptyLabel}</div>
+            </div>`
+          : `<div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              ${items.map(s => {
+                const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
+                if(!ex) return '';
+                const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : '';
+                const start = s.start_weight ? `${s.start_weight}kg start` : '';
+                const tgtNote = s.target_note ? s.target_note : '';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg1);border:1px solid var(--bdr);border-radius:var(--r);transition:.15s">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12.5px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ex.name}</div>
+                    ${tgtNote ? `<div style="font-size:9.5px;color:var(--t3);margin-top:2px">${tgtNote}</div>` : ''}
+                  </div>
+                  ${tgt ? `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:${accent};white-space:nowrap">${tgt}</span>` : ''}
+                  ${start ? `<span style="font-size:9.5px;color:var(--t3);font-family:'JetBrains Mono',monospace;white-space:nowrap">${start}</span>` : ''}
+                </div>`;
+              }).join('')}
+            </div>`
+        }
+        <button class="${logBtn.cls}" onclick="${logBtn.action}" style="margin-top:12px;width:100%;font-size:11.5px;${items.length === 0 ? 'opacity:.55' : ''}" ${items.length === 0 ? 'disabled' : ''}>${logBtn.label}</button>
+      </div>`;
+  };
+
   const todayCard = `
-    <div class="card" style="margin-bottom:1rem;border-left:4px solid var(--acc)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem">
-        <div style="font-size:14px;font-weight:800;color:var(--t0)">💪 Latihan Hari Ini</div>
-        <span style="font-size:11px;color:var(--t2);font-weight:600">${dayFull}</span>
-        <span style="margin-left:auto;font-size:10px;background:var(--acc);color:#fff;padding:2px 10px;border-radius:10px;font-weight:800">${dayShort}</span>
+    <div style="margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem;padding:0 .25rem">
+        <span style="font-size:11px;font-weight:800;background:var(--acc);color:#fff;padding:3px 11px;border-radius:10px;letter-spacing:.4px">HARI INI · ${dayShort.toUpperCase()}</span>
+        <span style="font-size:12px;color:var(--t1);font-weight:700">${dayFull}</span>
+        <span style="margin-left:auto;font-size:10.5px;color:var(--t3)">Filter otomatis dari training_day exercise.</span>
       </div>
       ${todaySel.length === 0
-        ? `<div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">
-            Belum ada exercise di-set untuk hari <b>${dayShort}</b>.
-            <br><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="setTab(1)">Set Hari di Builder →</button>
+        ? `<div class="card" style="border-left:4px solid var(--acc);padding:1.5rem 1.25rem;text-align:center">
+            <div style="font-size:32px;margin-bottom:8px;opacity:.5">📭</div>
+            <div style="font-size:13px;color:var(--t1);margin-bottom:10px">Belum ada exercise di-set untuk hari <b style="color:var(--t0)">${dayShort}</b>.</div>
+            <button class="btn btn-primary" onclick="setTab(1)">Set Hari di Builder →</button>
           </div>`
-        : `<div style="display:grid;grid-template-columns:${todayCardio.length>0&&todayGym.length>0?'1fr 1fr':'1fr'};gap:12px">
-            ${todayGym.length > 0 ? `
-            <div>
-              <div style="font-size:11px;font-weight:800;color:var(--f1);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--bdr)">🏋️ Gym · ${todayGym.length}</div>
-              ${todayGym.map(s => {
-                const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
-                if(!ex) return '';
-                const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : (s.target_note||'—');
-                const start = s.start_weight ? `start ${s.start_weight}kg` : '';
-                return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">
-                  <b style="font-size:12.5px;color:var(--t0);flex:1">${ex.name}</b>
-                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--acc)">${tgt}</span>
-                  ${start ? `<span style="font-size:9.5px;color:var(--t3)">${start}</span>` : ''}
-                </div>`;
-              }).join('')}
-              <div style="margin-top:8px"><button class="btn btn-gym" onclick="setLogSubTab('gym');setTab(3)" style="font-size:11px">📝 Log Gym →</button></div>
-            </div>` : ''}
-            ${todayCardio.length > 0 ? `
-            <div>
-              <div style="font-size:11px;font-weight:800;color:var(--f3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--bdr)">🏃 Cardio · ${todayCardio.length}</div>
-              ${todayCardio.map(s => {
-                const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
-                if(!ex) return '';
-                const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : (s.target_note||'—');
-                return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">
-                  <b style="font-size:12.5px;color:var(--t0);flex:1">${ex.name}</b>
-                  <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--f3)">${tgt}</span>
-                </div>`;
-              }).join('')}
-              <div style="margin-top:8px"><button class="btn btn-cardio" onclick="setLogSubTab('cardio');setTab(3)" style="font-size:11px">📝 Log Cardio →</button></div>
-            </div>` : ''}
+        : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            ${renderSide(todayGym, {
+              icon: '🏋️',
+              label: 'Gym',
+              accent: 'var(--f1)',
+              accentBg: 'rgba(255,107,53,.04)',
+              emptyLabel: `Belum ada gym exercise<br>untuk hari ${dayShort}`,
+              logBtn: { cls: 'btn btn-gym', action: "setLogSubTab('gym');setTab(3)", label: '📝 Log Gym Session →' }
+            })}
+            ${renderSide(todayCardio, {
+              icon: '🏃',
+              label: 'Cardio',
+              accent: 'var(--f3)',
+              accentBg: 'rgba(16,185,129,.04)',
+              emptyLabel: `Belum ada cardio exercise<br>untuk hari ${dayShort}`,
+              logBtn: { cls: 'btn btn-cardio', action: "setLogSubTab('cardio');setTab(3)", label: '📝 Log Cardio Session →' }
+            })}
           </div>`}
     </div>`;
 
