@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=24';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=25';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -190,7 +190,7 @@ export function pOverview(){
               }).join('')}
             </div>`
         }
-        <button class="${logBtn.cls}" onclick="${logBtn.action}" style="margin-top:12px;width:100%;font-size:11.5px;${items.length === 0 ? 'opacity:.55' : ''}" ${items.length === 0 ? 'disabled' : ''}>${logBtn.label}</button>
+        ${logBtn ? `<button class="${logBtn.cls}" onclick="${logBtn.action}" style="margin-top:12px;width:100%;font-size:11.5px;${items.length === 0 ? 'opacity:.55' : ''}" ${items.length === 0 ? 'disabled' : ''}>${logBtn.label}</button>` : ''}
       </div>`;
   };
 
@@ -222,7 +222,7 @@ export function pOverview(){
               accent: 'var(--f3)',
               accentBg: 'rgba(16,185,129,.04)',
               emptyLabel: `Belum ada cardio exercise<br>untuk hari ${dayShort}`,
-              logBtn: { cls: 'btn btn-cardio', action: "setLogSubTab('cardio');setTab(3)", label: '📝 Log Cardio Session →' }
+              logBtn: null
             })}
           </div>`}
     </div>`;
@@ -1177,22 +1177,66 @@ export function pCardioLog(){
   return `
     ${stravaCard}
     ${programCard}
-    ${S.cardioLog.length ? `
+    ${S.cardioLog.length ? (()=>{
+      const f = S.cardioFilter;
+      const activityName = r => {
+        const n = r.notes || '';
+        return n.startsWith('[Strava]') ? n.replace(/^\[Strava\]\s*/, '') : (n || '—');
+      };
+      // Build unique cardio_type list dari data untuk filter
+      const typeSet = [...new Set(S.cardioLog.map(r => r.cardio_type).filter(Boolean))].sort();
+      const zoneSet = [...new Set(S.cardioLog.map(r => r.zone).filter(Boolean))].sort();
+      // Filter
+      const filtered = S.cardioLog.filter(r => {
+        const isStrava = (r.notes||'').startsWith('[Strava]');
+        if(f.type !== 'all' && r.cardio_type !== f.type) return false;
+        if(f.zone !== 'all' && r.zone !== f.zone) return false;
+        if(f.source === 'strava' && !isStrava) return false;
+        if(f.source === 'manual' && isStrava) return false;
+        if(f.search && !activityName(r).toLowerCase().includes(f.search.toLowerCase())) return false;
+        return true;
+      });
+      return `
     <div class="card">
-      <div class="card-title">🕐 Log Terakhir</div>
+      <div class="card-title">🕐 Log Terakhir <span style="font-size:10px;font-weight:600;color:var(--t3);margin-left:8px">${filtered.length} dari ${S.cardioLog.length}</span></div>
+      <div class="form-row" style="margin-bottom:.75rem">
+        <div class="form-group" style="flex:2;min-width:180px"><div class="form-lbl">Cari Aktivitas</div>
+          <input class="form-inp" type="text" placeholder="Search nama aktivitas..." value="${f.search}" oninput="setCardioFilter('search', this.value)">
+        </div>
+        <div class="form-group" style="min-width:120px"><div class="form-lbl">Tipe</div>
+          <select class="form-sel form-inp" onchange="setCardioFilter('type', this.value)">
+            <option value="all" ${f.type==='all'?'selected':''}>Semua</option>
+            ${typeSet.map(t=>`<option value="${t}" ${f.type===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="min-width:90px"><div class="form-lbl">Zone</div>
+          <select class="form-sel form-inp" onchange="setCardioFilter('zone', this.value)">
+            <option value="all" ${f.zone==='all'?'selected':''}>Semua</option>
+            ${zoneSet.map(z=>`<option value="${z}" ${f.zone===z?'selected':''}>${z}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="min-width:110px"><div class="form-lbl">Source</div>
+          <select class="form-sel form-inp" onchange="setCardioFilter('source', this.value)">
+            <option value="all" ${f.source==='all'?'selected':''}>Semua</option>
+            <option value="strava" ${f.source==='strava'?'selected':''}>🔗 Strava</option>
+            <option value="manual" ${f.source==='manual'?'selected':''}>Manual</option>
+          </select>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tanggal</th><th>Source</th><th>Day</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Source</th><th>Aktivitas</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
           <tbody>
-            ${S.cardioLog.slice(0,15).map(r=>{
+            ${filtered.slice(0,50).map(r=>{
               const isStrava = (r.notes||'').startsWith('[Strava]');
               const sourceCell = isStrava
-                ? `<span class="strava-badge" title="${(r.notes||'').replace(/"/g,'&quot;')}">🔗 Strava</span>`
+                ? `<span class="strava-badge">🔗 Strava</span>`
                 : `<span style="font-size:9.5px;color:var(--t3)">Manual</span>`;
+              const name = activityName(r);
               return `<tr>
               <td style="font-weight:700">${fmtDate(r.logged_date)}</td>
               <td>${sourceCell}</td>
-              <td><span style="font-size:11px;font-weight:700;color:var(--acc)">${r.training_day||'—'}</span></td>
+              <td style="font-size:11.5px;color:var(--t0);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${name.replace(/"/g,'&quot;')}">${name}</td>
               <td style="font-size:10.5px;color:var(--t2)">${r.slot||'—'}</td>
               <td>${r.cardio_type||'—'}</td>
               <td class="mono">${r.duration_min||'—'} min</td>
@@ -1205,7 +1249,8 @@ export function pCardioLog(){
           </tbody>
         </table>
       </div>
-    </div>` : ''}`;
+    </div>`;
+    })() : ''}`;
 }
 
 // ── CARDIO: WEEKLY SUMMARY ───────────────────────────────

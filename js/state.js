@@ -47,6 +47,12 @@ export const S = {
 
   // cardio
   cardioLog: [],
+  cardioFilter: {
+    search: '',       // search by activity name
+    type: 'all',      // 'all' | cardio_type values
+    zone: 'all',      // 'all' | 'Z1' | 'Z2' | 'Z3' | 'Z4'
+    source: 'all',    // 'all' | 'strava' | 'manual'
+  },
   cardioDraft: {
     date: '',
     weekNum: 1,
