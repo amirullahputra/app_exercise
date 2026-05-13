@@ -6,7 +6,7 @@ export const S = {
   // 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
   tab: 1,                       // default ke Builder (cart) supaya user langsung pilih
   logSubTab: 'gym',             // 'gym' | 'cardio' inside Log tab
-  quarterId: 'Q3_2026',
+  quarterId: 'Q2_2026',
   quarters: [],
   user: null,
 

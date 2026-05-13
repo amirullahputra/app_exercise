@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=11';
+import { S, weekFromDate } from './state.js?v=12';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=11';
+} from './supabase.js?v=12';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=11';
+} from './panels.js?v=12';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -557,7 +557,7 @@ render();
       if(sharedQ) initSem = semFromQ(sharedQ);
     } catch(e){}
     const found = initSem && S.quarters.find(q => q.quarter_id === initSem);
-    const defaultQ = S.quarters.find(q => q.quarter_id === 'Q3_2026') || S.quarters[0];
+    const defaultQ = S.quarters.find(q => q.quarter_id === 'Q2_2026') || S.quarters[0];
     S.quarterId = found ? initSem : defaultQ.quarter_id;
   }
   render();  // refresh setelah quarters load
