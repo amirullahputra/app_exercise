@@ -231,30 +231,31 @@ export function pOverview(){
     +'<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:#fff;background:var(--f3);padding:2px 9px;border-radius:10px">'+_showCL.length+'</span>'
     +'</div>'+_cardioBody+'</div>';
 
+  const _gymSideHtml = todaySel.length === 0
+    ? `<div class="card" style="border-left:4px solid var(--f1);padding:1.25rem;text-align:center">
+        <div style="font-size:24px;margin-bottom:6px;opacity:.5">📭</div>
+        <div style="font-size:12px;color:var(--t1);margin-bottom:10px">Belum ada gym exercise di-set untuk hari <b>${dayShort}</b>.</div>
+        <button class="btn btn-gym" onclick="setTab(1)">Set di Builder →</button>
+      </div>`
+    : renderSide(todayGym, {
+        icon: '🏋️',
+        label: 'Gym',
+        accent: 'var(--f1)',
+        accentBg: 'rgba(255,107,53,.04)',
+        emptyLabel: `Belum ada gym exercise<br>untuk hari ${dayShort}`,
+        logBtn: { cls: 'btn btn-gym', action: "setLogSubTab('gym');setTab(3)", label: '📝 Log Gym Session →' }
+      });
+
   const todayCard = `
     <div style="margin-bottom:1.25rem">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:.75rem;padding:0 .25rem">
         <span style="font-size:11px;font-weight:800;background:var(--acc);color:#fff;padding:3px 11px;border-radius:10px;letter-spacing:.4px">HARI INI · ${dayShort.toUpperCase()}</span>
         <span style="font-size:12px;color:var(--t1);font-weight:700">${dayFull}</span>
-        <span style="margin-left:auto;font-size:10.5px;color:var(--t3)">Filter otomatis dari training_day exercise.</span>
       </div>
-      ${todaySel.length === 0
-        ? `<div class="card" style="border-left:4px solid var(--acc);padding:1.5rem 1.25rem;text-align:center">
-            <div style="font-size:32px;margin-bottom:8px;opacity:.5">📭</div>
-            <div style="font-size:13px;color:var(--t1);margin-bottom:10px">Belum ada exercise di-set untuk hari <b style="color:var(--t0)">${dayShort}</b>.</div>
-            <button class="btn btn-primary" onclick="setTab(1)">Set Hari di Builder →</button>
-          </div>`
-        : `<div class="today-split">
-            ${renderSide(todayGym, {
-              icon: '🏋️',
-              label: 'Gym',
-              accent: 'var(--f1)',
-              accentBg: 'rgba(255,107,53,.04)',
-              emptyLabel: `Belum ada gym exercise<br>untuk hari ${dayShort}`,
-              logBtn: { cls: 'btn btn-gym', action: "setLogSubTab('gym');setTab(3)", label: '📝 Log Gym Session →' }
-            })}
-            ${_cardioSideHtml}
-          </div>`}
+      <div class="today-split">
+        ${_gymSideHtml}
+        ${_cardioSideHtml}
+      </div>
     </div>`;
 
   // ── WEEK SCOPE: hitung sesi minggu ini (Senin-Minggu) + hari ini ──
