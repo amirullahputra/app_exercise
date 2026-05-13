@@ -116,8 +116,9 @@ let _quarters = null;
 let _quartersLoaded = false;
 export async function loadQuarters(){
   if(_quartersLoaded) return _quarters;
+  // master_timeline ga punya kolom phase_type — pakai focus_exercise/label_short sebagai fallback display.
   const data = await restFetch('master_timeline',
-    'select=period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,phase_type,sort_order&order=sort_order.asc');
+    'select=period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,focus_exercise,label_short,sort_order&order=sort_order.asc');
 
   const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }); };
   _quarters = (data || []).filter(r => r.period_id).map(r => ({
@@ -128,7 +129,8 @@ export async function loadQuarters(){
     bf_end:      r.bf_end_pct,
     date_start:  r.date_start,
     date_end:    r.date_end,
-    phase_type:  r.phase_type || null,
+    // Phase display: pakai focus_exercise (e.g. "Hypertrophy") atau label_short ("Q3 2026 Bulk") sebagai fallback
+    phase_type:  r.focus_exercise || r.label_short || null,
     total_weeks: (r.week_start && r.week_end) ? (r.week_end - r.week_start + 1) : 13,
     window_raw:  (r.date_start && r.date_end) ? `${fmtD(r.date_start)} → ${fmtD(r.date_end)}` : '',
   }));
