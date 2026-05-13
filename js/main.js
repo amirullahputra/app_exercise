@@ -345,7 +345,8 @@ window.deleteSession = async function(id){
 // ── CARDIO DRAFT ──
 window.updateCardioDraft = function(){
   const d = S.cardioDraft;
-  d.date       = document.getElementById('c-date')?.value||'';
+  d.date        = document.getElementById('c-date')?.value||'';
+  d.trainingDay = document.getElementById('c-training-day')?.value||'';
   d.slot       = document.getElementById('c-slot')?.value||'Z1_NEAT';
   d.cardioType = document.getElementById('c-type')?.value||'incline_walk';
   d.duration   = parseInt(document.getElementById('c-dur')?.value)||60;
@@ -367,6 +368,7 @@ window.submitCardioEntry = async function(){
   try{
     await saveCardioEntry(S.user.id, S.quarterId, {
       logged_date:dateVal, week_num:wk,
+      training_day: d.trainingDay || null,
       slot:d.slot, cardio_type:d.cardioType,
       duration_min:parseInt(d.duration)||null,
       distance_km:parseFloat(d.distance)||null,

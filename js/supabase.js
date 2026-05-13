@@ -147,7 +147,7 @@ export async function deleteGymSession(sessionId){
 // ── CARDIO LOG ──
 export async function loadCardioLog(userId, quarterId){
   const { data } = await supa.from('cardio_log')
-    .select('id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes')
+    .select('id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes,training_day')
     .eq('user_id', userId).eq('quarter_id', quarterId)
     .order('logged_date', { ascending: false });
   return data || [];

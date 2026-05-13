@@ -935,10 +935,18 @@ export function pCardioLog(){
   const CARDIO_CATS = new Set(['bike','run','swim']);
   const sel = (S.programSel && S.programSel[S.quarterId]) || [];
   const lib = S.exerciseLibrary || [];
-  const cardioProgram = sel
+  const selectedDay = d.trainingDay || '';
+  const cardioAll = sel
     .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
     .filter(r => r.ex && CARDIO_CATS.has(r.ex.category))
     .sort((a,b) => (a.s.sort_order||0) - (b.s.sort_order||0));
+  const cardioProgram = cardioAll.filter(r => !selectedDay || r.s.training_day === selectedDay);
+
+  // Training day options (unique days dari cardio cart)
+  const allDays = [...new Set(cardioAll.map(r => r.s.training_day).filter(Boolean))].sort();
+  const dayOpts = ['', ...allDays].map(day =>
+    `<option value="${day}" ${d.trainingDay===day?'selected':''}>${day||'— Semua hari —'}</option>`
+  ).join('');
 
   const programCard = cardioProgram.length ? `
     <div class="card" style="margin-bottom:1rem">
@@ -966,6 +974,12 @@ export function pCardioLog(){
         <div class="form-group"><div class="form-lbl">Tanggal</div>
           <input class="form-inp" type="date" id="c-date" value="${today}" oninput="updateCardioDraft()">
         </div>
+        ${allDays.length > 0 ? `
+        <div class="form-group" style="min-width:110px"><div class="form-lbl">Training Day</div>
+          <select class="form-sel form-inp" id="c-training-day" onchange="updateCardioDraft(); renderPanels()">
+            ${dayOpts}
+          </select>
+        </div>` : ''}
         <div class="form-group"><div class="form-lbl">Slot</div>
           <select class="form-sel form-inp" id="c-slot" onchange="updateCardioDraft()">
             ${slotOpts.map(o=>`<option value="${o.v}" ${d.slot===o.v?'selected':''}>${o.l}</option>`).join('')}
@@ -1014,10 +1028,11 @@ export function pCardioLog(){
       <div class="card-title">🕐 Log Terakhir</div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tanggal</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Day</th><th>Slot</th><th>Tipe</th><th>Durasi</th><th>Jarak</th><th>HR Avg</th><th>Zone</th><th></th></tr></thead>
           <tbody>
             ${S.cardioLog.slice(0,15).map(r=>`<tr>
               <td style="font-weight:700">${fmtDate(r.logged_date)}</td>
+              <td><span style="font-size:11px;font-weight:700;color:var(--acc)">${r.training_day||'—'}</span></td>
               <td style="font-size:10.5px;color:var(--t2)">${r.slot||'—'}</td>
               <td>${r.cardio_type||'—'}</td>
               <td class="mono">${r.duration_min||'—'} min</td>

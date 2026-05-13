@@ -49,6 +49,7 @@ export const S = {
   cardioDraft: {
     date: '',
     weekNum: 1,
+    trainingDay: '',
     slot: 'Z1_NEAT',
     cardioType: 'incline_walk',
     duration: 60,
