@@ -47,7 +47,6 @@ const TABS = [
 // ── RENDER ──
 function renderQselRow(){
   const el = document.getElementById('qsel-row');
-  // Override container styling → grid 4-col, no border/padding (clean wrapper)
   el.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;background:none;border:none;padding:0;box-shadow:none';
 
   if(!S.quarters?.length){
@@ -55,15 +54,12 @@ function renderQselRow(){
     return;
   }
 
-  // Sort chronologically (year asc, semester asc: Q1Q2 before Q3Q4)
-  const yearOf = qid => parseInt(qid.split('_')[1]) || 9999;
-  const semOf  = qid => qid.startsWith('Q1Q2') ? 1 : 2;
-  const sorted = [...S.quarters].sort((a,b) => {
-    const dy = yearOf(a.quarter_id) - yearOf(b.quarter_id);
-    return dy !== 0 ? dy : semOf(a.quarter_id) - semOf(b.quarter_id);
-  });
-  // Show first 4 (semester pertama protokol — 2 tahun pertama)
-  const visible = sorted.slice(0, 4);
+  // Sort per-quarter chronologically: Q1_2026 < Q2_2026 < Q3_2026 ...
+  const parseQ = id => { const m=(id||'').match(/Q(\d)_(\d{4})/); return m ? parseInt(m[2])*10+parseInt(m[1]) : 9999; };
+  const sorted = [...S.quarters].sort((a,b) => parseQ(a.quarter_id) - parseQ(b.quarter_id));
+  // Show 4 quarters starting from Q2_2026
+  const startIdx = Math.max(0, sorted.findIndex(q => q.quarter_id === 'Q2_2026'));
+  const visible = sorted.slice(startIdx, startIdx + 4);
 
   el.innerHTML = visible.map(q => {
     const sel = S.quarterId === q.quarter_id;
@@ -131,33 +127,32 @@ function render(){
   renderPanel();
 }
 window.render = render;
+window.renderPanels = renderPanel;
 
 // ── QUARTER SYNERGY BRIDGE ──
-// Canonical localStorage key 'vhm.activeQuarter' pakai quarter format (Q3_2026).
-// App ini pakai semester format (Q3Q4_2026), jadi translate via tabel ini.
+// App now uses period_id (individual quarters) directly.
+// semFromQ kept for backward compat with shared localStorage key.
 const QUARTER_TO_SEMESTER = {
   'Q1_2026':'Q1Q2_2026','Q2_2026':'Q1Q2_2026',
   'Q3_2026':'Q3Q4_2026','Q4_2026':'Q3Q4_2026',
   'Q1_2027':'Q1Q2_2027','Q2_2027':'Q1Q2_2027',
-  'Q3_2027':'Q3Q4_2027','Q4_2027':'Q3Q4_2027',
-  'Q1_2028':'Q1Q2_2028','Q2_2028':'Q1Q2_2028',
-  'Q3_2028':'Q3Q4_2028','Q4_2028':'Q3Q4_2028'
 };
-const SEMESTER_FIRST_QUARTER = {
-  'Q1Q2_2026':'Q1_2026','Q3Q4_2026':'Q3_2026',
-  'Q1Q2_2027':'Q1_2027','Q3Q4_2027':'Q3_2027',
-  'Q1Q2_2028':'Q1_2028','Q3Q4_2028':'Q3_2028'
-};
-function semFromQ(q){ return QUARTER_TO_SEMESTER[q] || q; }
-function firstQOfSem(sem){ return SEMESTER_FIRST_QUARTER[sem] || sem; }
+function semFromQ(q){
+  // If another app sends period_id, keep as-is (now same format)
+  // If it sends a semester_id (Q3Q4_2026), extract first period
+  if(q && q.match(/^Q\d_\d{4}$/)) return q;  // already period_id
+  const sem2q = { 'Q1Q2_2026':'Q2_2026','Q3Q4_2026':'Q3_2026','Q1Q2_2027':'Q1_2027','Q3Q4_2027':'Q3_2027' };
+  return sem2q[q] || q;
+}
+function firstQOfSem(sem){ return sem; }
 window.VHM_QUARTER_BRIDGE = { semFromQ, firstQOfSem };
 
 // ── ACTIONS ──
 async function setQuarter(qid){
   S.quarterId = qid;
   try {
-    localStorage.setItem('vhm.activeSemester', qid);
-    localStorage.setItem('vhm.activeQuarter', firstQOfSem(qid));
+    localStorage.setItem('vhm.activeSemester', QUARTER_TO_SEMESTER[qid] || qid);
+    localStorage.setItem('vhm.activeQuarter', qid);
   } catch(e){}
   render();  // immediate visual feedback (gak nunggu DB async)
   try {
@@ -294,11 +289,23 @@ window.onTargetBlur = async function(id, field, value){
   await updateProgramTarget(id, sel.target_value, sel.target_unit, sel.target_note);
 };
 
+// Handler untuk training_day + start_weight (extra fields di program selection)
+window.onSelFieldBlur = async function(id, field, value){
+  const sel = Object.values(S.programSel).flat().find(s => s.id === id);
+  if(!sel) return;
+  const val = field === 'start_weight' ? (parseFloat(value)||null) : (value||null);
+  sel[field] = val;
+  try {
+    await updateProgramTarget(id, sel.target_value, sel.target_unit, sel.target_note, { [field]: val });
+  } catch(e){ console.error('onSelFieldBlur:', e); }
+};
+
 // ── GYM DRAFT ──
 window.updateGymDraftMeta = function(){
-  S.gymDraft.date     = document.getElementById('gym-date')?.value||'';
-  S.gymDraft.duration = parseInt(document.getElementById('gym-dur')?.value)||60;
-  S.gymDraft.notes    = document.getElementById('gym-notes')?.value||'';
+  S.gymDraft.date        = document.getElementById('gym-date')?.value||'';
+  S.gymDraft.duration    = parseInt(document.getElementById('gym-dur')?.value)||60;
+  S.gymDraft.notes       = document.getElementById('gym-notes')?.value||'';
+  S.gymDraft.trainingDay = document.getElementById('gym-training-day')?.value||'';
 };
 
 window.updateDraftSet = function(block, exercise, idx, field, val){
@@ -317,7 +324,8 @@ window.submitGymSession = async function(){
   const dur = parseInt(document.getElementById('gym-dur')?.value)||60;
   const notes = document.getElementById('gym-notes')?.value||'';
   try{
-    const session = await saveGymSession(S.user.id, S.quarterId, dateVal, wk, dur, notes);
+    const trainingDay = document.getElementById('gym-training-day')?.value||null;
+    const session = await saveGymSession(S.user.id, S.quarterId, dateVal, wk, dur, notes, trainingDay);
     const validSets = S.gymDraft.sets.filter(s=>s.reps||s.weight_kg);
     if(validSets.length) await saveGymSets(session.id, validSets);
     S.gymDraft.sets=[]; S.gymDraft.notes='';
@@ -535,7 +543,8 @@ function showInitError(msg){
       if(sharedQ) initSem = semFromQ(sharedQ);
     } catch(e){}
     const found = initSem && S.quarters.find(q => q.quarter_id === initSem);
-    S.quarterId = found ? initSem : S.quarters[0].quarter_id;
+    const defaultQ = S.quarters.find(q => q.quarter_id === 'Q3_2026') || S.quarters[0];
+    S.quarterId = found ? initSem : defaultQ.quarter_id;
   }
 
   try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ errs.push('loadExerciseLibrary: '+(e.message||e)); S.exerciseLibrary=[]; }

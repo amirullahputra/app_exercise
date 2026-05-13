@@ -175,6 +175,7 @@ export function pBuilder(){
               if(!ex) return '';
               const isCardio = ['run','bike','swim'].includes(ex.category);
               const unitOpts = isCardio ? ['km','min','m']:['kg','reps','rpe'];
+              const DAYS = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
               return `<div class="bld-sel-item">
                 <div class="bld-sel-row1">
                   <span class="bld-sel-cat-pip ${ex.category}"></span>
@@ -193,11 +194,44 @@ export function pBuilder(){
                          value="${s.target_note||''}"
                          onblur="onTargetBlur(${s.id},'target_note',this.value)">
                 </div>
+                <div class="bld-sel-row2" style="margin-top:4px">
+                  <select class="bld-tgt-unit" style="min-width:90px"
+                          onchange="onSelFieldBlur(${s.id},'training_day',this.value)">
+                    <option value="">Hari?</option>
+                    ${DAYS.map(d=>`<option value="${d}"${s.training_day===d?' selected':''}>${d}</option>`).join('')}
+                  </select>
+                  <input type="number" step="2.5" min="0" placeholder="start kg" class="bld-tgt-val"
+                         style="max-width:90px" title="Start beban (kg) untuk auto-progression di Plan"
+                         value="${s.start_weight||''}"
+                         onblur="onSelFieldBlur(${s.id},'start_weight',this.value)">
+                  <span style="font-size:9.5px;color:var(--t3);align-self:center">start kg → target</span>
+                </div>
               </div>`;
             }).join('')}</div>`
         }
       </div>
     </div>`;
+}
+
+// ── PLAN — helpers ─────────────────────────────────────────
+// Hitung weekly progression: startW → targetW over totalWeeks, deload tiap week 4/8/12
+function computeProgression(startW, targetW, totalWeeks){
+  if(!startW || !targetW) return null;
+  const deloads = new Set();
+  for(let w = 4; w <= totalWeeks; w += 4) deloads.add(w);
+  const workWkCount = totalWeeks - deloads.size;
+  const step = workWkCount > 1 ? (targetW - startW) / (workWkCount - 1) : 0;
+  const result = []; let wi = 0; let prevLoad = startW;
+  for(let w = 1; w <= totalWeeks; w++){
+    if(deloads.has(w)){
+      result.push({ load: Math.round(prevLoad * 0.85 / 2.5) * 2.5, deload: true });
+    } else {
+      const load = Math.round((startW + step * wi) / 2.5) * 2.5;
+      result.push({ load, deload: false });
+      prevLoad = load; wi++;
+    }
+  }
+  return result;
 }
 
 // ── PLAN ──────────────────────────────────────────────────
@@ -209,17 +243,46 @@ export function pPlan(){
   const q = (S.quarters||[]).find(x => x.quarter_id === S.quarterId);
   const totalWeeks = q?.total_weeks || 13;
 
+  // Group exercises by training_day untuk legend
+  const byDay = {};
+  sel.forEach(s => {
+    const day = s.training_day || '—';
+    if(!byDay[day]) byDay[day] = [];
+    byDay[day].push(s);
+  });
+
+  // Legend hari
+  const dayLegend = Object.keys(byDay).filter(d => d !== '—').length > 0
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${Object.entries(byDay).map(([day, items]) => `
+          <span style="font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--bdr)">
+            ${day} · ${items.length} exercise
+          </span>`).join('')}
+       </div>` : '';
+
+  // Deload week labels
+  const deloads = new Set();
+  for(let w = 4; w <= totalWeeks; w += 4) deloads.add(w);
+
   return `
     <div class="card">
       <div style="font-size:13px;font-weight:800;margin-bottom:.5rem">📅 Plan ${S.quarterId.replace('_',' ')} — ${totalWeeks} weeks</div>
-      <div style="font-size:11.5px;color:var(--t2);margin-bottom:1rem">Grid week × exercise (per-week dose editing — coming Phase B)</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:.75rem">
+        Deload otomatis tiap W4/W8/W12 (85%). Set <b>Hari</b> + <b>Start kg</b> di Builder untuk auto-fill progression.
+      </div>
+      ${dayLegend}
       <div style="overflow-x:auto">
         <table class="plan-tbl">
           <thead>
             <tr>
-              <th>Exercise</th>
-              <th>Target</th>
-              ${Array.from({length:totalWeeks}, (_,i)=>`<th>W${i+1}</th>`).join('')}
+              <th style="min-width:160px">Exercise</th>
+              <th style="width:52px">Hari</th>
+              <th style="width:80px">Target</th>
+              ${Array.from({length:totalWeeks}, (_,i)=>{
+                const w = i+1;
+                const isDeload = deloads.has(w);
+                return `<th style="${isDeload?'background:rgba(245,158,11,.15);color:var(--pro)':''}">W${w}${isDeload?'<br><span style="font-size:8px;font-weight:600">DL</span>':''}</th>`;
+              }).join('')}
             </tr>
           </thead>
           <tbody>
@@ -227,14 +290,37 @@ export function pPlan(){
               const ex = (S.exerciseLibrary||[]).find(e => e.slug === s.exercise_slug);
               if(!ex) return '';
               const tgt = s.target_value ? `${s.target_value}${s.target_unit||''}` : '—';
+              const prog = computeProgression(s.start_weight, s.target_value, totalWeeks);
               return `<tr>
-                <td><b>${ex.name}</b><br><span style="font-size:9.5px;color:var(--t3)">${ex.category}</span></td>
-                <td>${tgt}</td>
-                ${Array.from({length:totalWeeks}, ()=>`<td class="plan-cell">·</td>`).join('')}
+                <td>
+                  <b style="font-size:12px">${ex.name}</b>
+                  <br><span style="font-size:9.5px;color:var(--t3)">${ex.category}</span>
+                </td>
+                <td style="text-align:center">
+                  <span style="font-size:11px;font-weight:800;color:var(--acc)">${s.training_day||'—'}</span>
+                </td>
+                <td>
+                  <span style="font-size:11px;font-weight:800">${tgt}</span>
+                  ${s.start_weight ? `<br><span style="font-size:9px;color:var(--t3)">${s.start_weight}→${s.target_value||'?'}kg</span>` : ''}
+                </td>
+                ${Array.from({length:totalWeeks}, (_,i)=>{
+                  const w = i+1;
+                  const isDeload = deloads.has(w);
+                  if(!prog){
+                    return `<td class="plan-cell" style="${isDeload?'background:rgba(245,158,11,.08)':''}">·</td>`;
+                  }
+                  const cell = prog[i];
+                  const bg = isDeload ? 'background:rgba(245,158,11,.15)' : '';
+                  const col = isDeload ? 'color:var(--pro)' : cell.load >= (s.target_value||0)*0.95 ? 'color:var(--f3)' : 'color:var(--t1)';
+                  return `<td class="plan-cell" style="${bg};font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;${col}">${cell.load}</td>`;
+                }).join('')}
               </tr>`;
             }).join('')}
           </tbody>
         </table>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:8px">
+        💡 DL = Deload week (85% dari beban sebelumnya). Set <b>Hari</b> + <b>Start kg</b> di Builder tab untuk lihat auto-fill.
       </div>
     </div>`;
 }
@@ -668,6 +754,12 @@ export function pGymLog(){
   const lib = S.exerciseLibrary || [];
   const today = new Date().toISOString().split('T')[0];
 
+  // Ambil semua training days yang terdaftar di cart (untuk selector)
+  const allDays = [...new Set(sel.map(s => s.training_day).filter(Boolean))].sort();
+  const dayOpts = ['', ...allDays].map(d =>
+    `<option value="${d}" ${S.gymDraft.trainingDay===d?'selected':''}>${d||'— Semua hari —'}</option>`
+  ).join('');
+
   // Detail Sesi card — selalu render (independen dari cart)
   const detailCard = `
     <div class="card" style="margin-bottom:1rem">
@@ -679,6 +771,12 @@ export function pGymLog(){
         <div class="form-group" style="flex:1;min-width:90px"><div class="form-lbl">Durasi (min)</div>
           <input class="form-inp" style="width:100%" type="number" id="gym-dur" value="${S.gymDraft.duration}" oninput="updateGymDraftMeta()">
         </div>
+        ${allDays.length > 0 ? `
+        <div class="form-group" style="min-width:110px"><div class="form-lbl">Training Day</div>
+          <select class="form-inp" id="gym-training-day" onchange="updateGymDraftMeta(); renderPanels()">
+            ${dayOpts}
+          </select>
+        </div>` : ''}
         <div class="form-group" style="flex:1"><div class="form-lbl">Notes</div>
           <input class="form-inp" type="text" id="gym-notes" placeholder="Opsional..." value="${S.gymDraft.notes}" oninput="updateGymDraftMeta()">
         </div>
@@ -688,9 +786,11 @@ export function pGymLog(){
   // Resolve sel → library entries, sort by sort_order
   // Skip cardio categories (bike/run/swim) — those belong in Cardio Log
   const CARDIO_CATS = new Set(['bike','run','swim']);
+  const selectedDay = S.gymDraft.trainingDay || '';
   const resolved = sel
     .map(s => ({ s, ex: lib.find(e => e.slug === s.exercise_slug) }))
     .filter(r => r.ex && !CARDIO_CATS.has(r.ex.category))
+    .filter(r => !selectedDay || r.s.training_day === selectedDay)
     .sort((a,b) => (a.s.sort_order||0) - (b.s.sort_order||0));
 
   // Empty state: belum ada exercise di Builder cart
@@ -700,11 +800,12 @@ export function pGymLog(){
         <div class="card-title">🕐 Riwayat Sesi</div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Tanggal</th><th>Week</th><th>Durasi</th><th>Notes</th><th></th></tr></thead>
+            <thead><tr><th>Tanggal</th><th>Week</th><th>Day</th><th>Durasi</th><th>Notes</th><th></th></tr></thead>
             <tbody>
               ${S.gymSessions.slice(0,10).map(s=>`<tr>
                 <td style="font-weight:700">${fmtDate(s.session_date)}</td>
                 <td><span class="bdg bdg-acc">W${s.week_num||'?'}</span></td>
+                <td><span style="font-size:11px;font-weight:700;color:var(--acc)">${s.training_day||'—'}</span></td>
                 <td class="mono">${s.duration_min||'—'} min</td>
                 <td style="color:var(--t2)">${s.notes||''}</td>
                 <td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteSession(${s.id})">Hapus</button></td>
@@ -786,11 +887,12 @@ export function pGymLog(){
       <div class="card-title">🕐 Riwayat Sesi</div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Tanggal</th><th>Week</th><th>Durasi</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Week</th><th>Day</th><th>Durasi</th><th>Notes</th><th></th></tr></thead>
           <tbody>
             ${S.gymSessions.slice(0,10).map(s=>`<tr>
               <td style="font-weight:700">${fmtDate(s.session_date)}</td>
               <td><span class="bdg bdg-acc">W${s.week_num||'?'}</span></td>
+              <td><span style="font-size:11px;font-weight:700;color:var(--acc)">${s.training_day||'—'}</span></td>
               <td class="mono">${s.duration_min||'—'} min</td>
               <td style="color:var(--t2)">${s.notes||''}</td>
               <td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteSession(${s.id})">Hapus</button></td>

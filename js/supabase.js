@@ -50,55 +50,25 @@ export async function getCurrentUser(){
   return user;
 }
 
-// ── QUARTERS (derived from master_timeline, aggregated per semester) ──
-// Old `quarters` + `quarter_content` tables di-drop. master_timeline sekarang
-// jadi single source: 20 rows per-quarter (Q1_2026 .. Q4_2030), tiap row
-// punya semester_id (mis. 'Q3Q4_2026') untuk grouping pair.
+// ── QUARTERS (per-period, individual quarters — tidak di-aggregate per semester) ──
 let _quarters = null;
 let _quartersLoaded = false;
 export async function loadQuarters(){
   if(_quartersLoaded) return _quarters;
   const { data, error } = await supa.from('master_timeline')
-    .select('period_id,semester_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order')
+    .select('period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order')
     .order('sort_order');
   if(error){ console.error('loadQuarters:', error); throw error; }
 
-  // Aggregate per semester: 2 rows (mis. Q3_2026+Q4_2026 same semester_id) → 1 entry
-  const map = new Map();
-  for(const r of (data || [])){
-    const id = r.semester_id || r.period_id;
-    if(!map.has(id)){
-      map.set(id, {
-        quarter_id: id,
-        bb_start:   r.bb_start_kg,
-        bb_end:     r.bb_end_kg,
-        bf_start:   r.bf_start_pct,
-        bf_end:     r.bf_end_pct,
-        _start:     r.date_start,
-        _end:       r.date_end,
-        _w_start:   r.week_start,
-        _w_end:     r.week_end
-      });
-    } else {
-      // Semester pair: row kedua extend end values
-      const ex = map.get(id);
-      ex.bb_end = r.bb_end_kg ?? ex.bb_end;
-      ex.bf_end = r.bf_end_pct ?? ex.bf_end;
-      ex._end   = r.date_end;
-      ex._w_end = r.week_end ?? ex._w_end;
-    }
-  }
-
-  // Format display fields (replaces dropped semester_window_raw)
-  const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' }); };
-  _quarters = [...map.values()].map(q => ({
-    quarter_id:  q.quarter_id,
-    bb_start:    q.bb_start,
-    bb_end:      q.bb_end,
-    bf_start:    q.bf_start,
-    bf_end:      q.bf_end,
-    total_weeks: (q._w_start && q._w_end) ? (q._w_end - q._w_start + 1) : null,
-    window_raw:  (q._start && q._end) ? `${fmtD(q._start)} → ${fmtD(q._end)}` : ''
+  const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }); };
+  _quarters = (data || []).map(r => ({
+    quarter_id:  r.period_id,
+    bb_start:    r.bb_start_kg,
+    bb_end:      r.bb_end_kg,
+    bf_start:    r.bf_start_pct,
+    bf_end:      r.bf_end_pct,
+    total_weeks: (r.week_start && r.week_end) ? (r.week_end - r.week_start + 1) : 13,
+    window_raw:  (r.date_start && r.date_end) ? `${fmtD(r.date_start)} → ${fmtD(r.date_end)}` : '',
   }));
   _quartersLoaded = true;
   return _quarters;
@@ -134,7 +104,7 @@ export async function loadGymProgram(quarterId){
 // ── GYM SESSIONS ──
 export async function loadGymSessions(userId, quarterId){
   const { data } = await supa.from('gym_sessions')
-    .select('id,session_date,week_num,duration_min,notes')
+    .select('id,session_date,week_num,duration_min,notes,training_day')
     .eq('user_id', userId).eq('quarter_id', quarterId)
     .order('session_date', { ascending: false });
   return data || [];
@@ -148,11 +118,12 @@ export async function loadGymSets(sessionId){
   return data || [];
 }
 
-export async function saveGymSession(userId, quarterId, sessionDate, weekNum, durationMin, notes){
+export async function saveGymSession(userId, quarterId, sessionDate, weekNum, durationMin, notes, trainingDay){
   const { data, error } = await supa.from('gym_sessions').insert({
     user_id: userId, quarter_id: quarterId,
     session_date: sessionDate, week_num: weekNum,
-    duration_min: durationMin, notes: notes || null
+    duration_min: durationMin, notes: notes || null,
+    training_day: trainingDay || null,
   }).select().single();
   if(error) throw error;
   return data;
@@ -227,7 +198,7 @@ export async function addExerciseLibraryItem(item){
 export async function loadProgramSelections(userId){
   if(!userId) return {};
   const { data, error } = await supa.from('exercise_program_selections')
-    .select('id,quarter_id,exercise_slug,target_value,target_unit,target_note,sort_order')
+    .select('id,quarter_id,exercise_slug,target_value,target_unit,target_note,sort_order,training_day,start_weight')
     .eq('user_id', userId)
     .order('sort_order');
   if(error){ console.error('loadProgramSelections:', error); throw error; }
@@ -256,9 +227,9 @@ export async function removeProgramSelection(id){
   if(error){ console.error('removeProgramSelection:', error); throw error; }
 }
 
-export async function updateProgramTarget(id, target_value, target_unit, target_note){
+export async function updateProgramTarget(id, target_value, target_unit, target_note, extras={}){
   const { error } = await supa.from('exercise_program_selections')
-    .update({ target_value, target_unit, target_note, updated_at: new Date().toISOString() })
+    .update({ target_value, target_unit, target_note, ...extras, updated_at: new Date().toISOString() })
     .eq('id', id);
   if(error){ console.error('updateProgramTarget:', error); throw error; }
 }
