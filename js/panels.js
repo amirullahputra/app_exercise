@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════
 // PANELS — Library + Gym + Cardio
 // ══════════════════════════════════════════════════════════
-import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=23';
+import { S, rpeColor, fmtDate, findLibraryByName } from './state.js?v=24';
 
 
 // ── LIBRARY METADATA ─────────────────────────────────────
@@ -1177,61 +1177,6 @@ export function pCardioLog(){
   return `
     ${stravaCard}
     ${programCard}
-    <div class="card" style="margin-bottom:1rem">
-      <div class="card-title">📝 Log Cardio Baru</div>
-      <div class="form-row">
-        <div class="form-group"><div class="form-lbl">Tanggal</div>
-          <input class="form-inp" type="date" id="c-date" value="${today}" oninput="updateCardioDraft()">
-        </div>
-        ${allDays.length > 0 ? `
-        <div class="form-group" style="min-width:110px"><div class="form-lbl">Training Day</div>
-          <select class="form-sel form-inp" id="c-training-day" onchange="updateCardioDraft(); renderPanels()">
-            ${dayOpts}
-          </select>
-        </div>` : ''}
-        <div class="form-group"><div class="form-lbl">Slot</div>
-          <select class="form-sel form-inp" id="c-slot" onchange="updateCardioDraft()">
-            ${slotOpts.map(o=>`<option value="${o.v}" ${d.slot===o.v?'selected':''}>${o.l}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><div class="form-lbl">Tipe</div>
-          <select class="form-sel form-inp" id="c-type" onchange="updateCardioDraft()">
-            ${typeOpts.map(o=>`<option value="${o.v}" ${d.cardioType===o.v?'selected':''}>${o.l}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><div class="form-lbl">Zone</div>
-          <select class="form-sel form-inp" id="c-zone" onchange="updateCardioDraft()">
-            ${zoneOpts.map(z=>`<option value="${z}" ${d.zone===z?'selected':''}>${z}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="flex:1;min-width:80px"><div class="form-lbl">Durasi (min)</div>
-          <input class="form-inp" style="width:100%" type="number" id="c-dur" value="${d.duration}" oninput="updateCardioDraft()">
-        </div>
-        <div class="form-group" style="flex:1;min-width:80px"><div class="form-lbl">Jarak (km)</div>
-          <input class="form-inp" style="width:100%" type="number" step="0.01" id="c-dist" value="${d.distance}" placeholder="—" oninput="updateCardioDraft()">
-        </div>
-        <div class="form-group" style="flex:1;min-width:70px"><div class="form-lbl">HR Avg</div>
-          <input class="form-inp" style="width:100%" type="number" id="c-hr" value="${d.hrAvg}" placeholder="—" oninput="updateCardioDraft()">
-        </div>
-        <div class="form-group" style="flex:1;min-width:70px"><div class="form-lbl">HR Max</div>
-          <input class="form-inp" style="width:100%" type="number" id="c-hrmax" value="${d.hrMax}" placeholder="—" oninput="updateCardioDraft()">
-        </div>
-        <div class="form-group" style="flex:1;min-width:70px"><div class="form-lbl">Incline %</div>
-          <input class="form-inp" style="width:100%" type="number" step="0.5" id="c-incline" value="${d.incline}" placeholder="—" oninput="updateCardioDraft()">
-        </div>
-        <div class="form-group" style="flex:1;min-width:80px"><div class="form-lbl">Speed km/h</div>
-          <input class="form-inp" style="width:100%" type="number" step="0.1" id="c-speed" value="${d.speed}" placeholder="—" oninput="updateCardioDraft()">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="flex:1"><div class="form-lbl">Notes</div>
-          <input class="form-inp" type="text" id="c-notes" value="${d.notes}" placeholder="Opsional..." oninput="updateCardioDraft()">
-        </div>
-      </div>
-      <button class="btn btn-cardio" onclick="submitCardioEntry()">💾 Simpan Log</button>
-    </div>
     ${S.cardioLog.length ? `
     <div class="card">
       <div class="card-title">🕐 Log Terakhir</div>

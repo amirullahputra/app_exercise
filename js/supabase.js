@@ -237,7 +237,7 @@ export async function deleteGymSession(sessionId){
 export async function loadCardioLog(userId, quarterId){
   try {
     const data = await authFetch('cardio_log',
-      `select=id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes,training_day&user_id=eq.${userId}&quarter_id=eq.${quarterId}&order=logged_date.desc`);
+      `select=id,logged_date,week_num,slot,cardio_type,duration_min,distance_km,hr_avg,hr_max,incline_pct,speed_kmh,zone,notes,training_day,strava_id&user_id=eq.${userId}&quarter_id=eq.${quarterId}&order=logged_date.desc`);
     return data || [];
   } catch(e){ console.error('loadCardioLog:', e); return []; }
 }
