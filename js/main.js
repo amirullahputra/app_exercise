@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js';
+import { S, weekFromDate } from './state.js?v=11';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions,
@@ -30,10 +30,10 @@ import {
   seedSelectionsFromGymProgram,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js';
+} from './supabase.js?v=11';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js';
+} from './panels.js?v=11';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -534,6 +534,18 @@ function showInitError(msg){
 }
 
 // ── INIT ──
+// Cleanup stale legacy localStorage values (semester format dari versi sebelumnya)
+try {
+  const legacy = localStorage.getItem('vhm.activeQuarter');
+  if(legacy && /^Q\dQ\d_/.test(legacy)){
+    localStorage.removeItem('vhm.activeQuarter');
+    localStorage.removeItem('vhm.activeSemester');
+  }
+} catch(_){}
+
+// Render skeleton SEKALI di awal — supaya UI tampil cepat meski data masih load
+render();
+
 (async()=>{
   const errs = [];
   try { S.quarters = await loadQuarters(); } catch(e){ errs.push('loadQuarters: '+(e.message||e)); S.quarters=[]; }
@@ -548,10 +560,13 @@ function showInitError(msg){
     const defaultQ = S.quarters.find(q => q.quarter_id === 'Q3_2026') || S.quarters[0];
     S.quarterId = found ? initSem : defaultQ.quarter_id;
   }
+  render();  // refresh setelah quarters load
 
+  // Public reads paralel (sudah pakai restFetch, safe)
   try { S.exerciseLibrary = await loadExerciseLibrary(); } catch(e){ errs.push('loadExerciseLibrary: '+(e.message||e)); S.exerciseLibrary=[]; }
   try { await loadContent(); } catch(e){ errs.push('loadContent: '+(e.message||e)); }
   try { S.gymProgram = await loadGymProgram(S.quarterId); } catch(e){ errs.push('loadGymProgram: '+(e.message||e)); S.gymProgram=[]; }
+  render();
 
   try {
     setupAuthListener(
@@ -560,6 +575,5 @@ function showInitError(msg){
     );
   } catch(e){ errs.push('setupAuthListener: '+(e.message||e)); }
 
-  render();
-  if(errs.length) showInitError(errs.join('\n'));
+  if(errs.length) console.warn('[init errors]', errs);
 })();

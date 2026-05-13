@@ -5,6 +5,30 @@ const SUPA_URL = 'https://guhhoqpvwzzrlwgfugsb.supabase.co';
 const SUPA_KEY = 'sb_publishable_yu8KTS5mId2hV7kVjScvZA_-geYqKHv';
 export const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
+// ── REST FETCH (untuk public reads — bypass GoTrueClient hang issue) ──
+// Pattern dari pep_fl: supa.from() bisa hang silent di Chrome incognito karena
+// GoTrueClient acquire navigator.locks. Untuk PUBLIC tables (RLS public_read),
+// pakai plain fetch ke REST endpoint biar bypass.
+async function restFetch(table, query=''){
+  const url = `${SUPA_URL}/rest/v1/${table}${query?'?'+query:''}`;
+  const res = await fetch(url, {
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+  });
+  if(!res.ok){
+    const body = await res.text().catch(()=>'');
+    throw new Error(`${table}: HTTP ${res.status} ${body.slice(0,200)}`);
+  }
+  return res.json();
+}
+
+// Timeout wrapper untuk async ops yang bisa hang
+function withTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(`${label} timeout ${ms}ms`)), ms))
+  ]);
+}
+
 // ── AUTH ──
 export function openAuthModal(){ document.getElementById('auth-modal').classList.add('open'); }
 export function closeAuthModal(){ document.getElementById('auth-modal').classList.remove('open'); document.getElementById('auth-err').textContent=''; }
@@ -50,18 +74,16 @@ export async function getCurrentUser(){
   return user;
 }
 
-// ── QUARTERS (per-period, individual quarters — tidak di-aggregate per semester) ──
+// ── QUARTERS (per-period, individual quarters — pakai restFetch bypass) ──
 let _quarters = null;
 let _quartersLoaded = false;
 export async function loadQuarters(){
   if(_quartersLoaded) return _quarters;
-  const { data, error } = await supa.from('master_timeline')
-    .select('period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order')
-    .order('sort_order');
-  if(error){ console.error('loadQuarters:', error); throw error; }
+  const data = await restFetch('master_timeline',
+    'select=period_id,date_start,date_end,week_start,week_end,bb_start_kg,bb_end_kg,bf_start_pct,bf_end_pct,sort_order&order=sort_order.asc');
 
   const fmtD = d => { if(!d) return ''; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }); };
-  _quarters = (data || []).map(r => ({
+  _quarters = (data || []).filter(r => r.period_id).map(r => ({
     quarter_id:  r.period_id,
     bb_start:    r.bb_start_kg,
     bb_end:      r.bb_end_kg,
@@ -78,27 +100,27 @@ export async function loadQuarters(){
 // quarterId bisa semester_id (Q3Q4_2026) atau period_id (Q3_2026); content
 // duplicate antara 2 row dalam 1 semester, jadi LIMIT 1 cukup.
 export async function loadQuarterContent(quarterId, docTypes=['GYM','CARDIO']){
-  const { data, error } = await supa.from('master_timeline')
-    .select('content_target_md,content_peptide_md,content_gym_md,content_cardio_md,content_nutrisi_md,content_vitamin_md')
-    .or(`semester_id.eq.${quarterId},period_id.eq.${quarterId}`)
-    .limit(1)
-    .maybeSingle();
-  if(error || !data) return {};
-  const result = {};
-  for(const t of docTypes){
-    const col = `content_${t.toLowerCase()}_md`;
-    if(data[col]) result[t] = data[col];
-  }
-  return result;
+  try {
+    const rows = await restFetch('master_timeline',
+      `select=content_target_md,content_peptide_md,content_gym_md,content_cardio_md,content_nutrisi_md,content_vitamin_md&or=(semester_id.eq.${quarterId},period_id.eq.${quarterId})&limit=1`);
+    const data = (rows||[])[0];
+    if(!data) return {};
+    const result = {};
+    for(const t of docTypes){
+      const col = `content_${t.toLowerCase()}_md`;
+      if(data[col]) result[t] = data[col];
+    }
+    return result;
+  } catch(e){ console.error('loadQuarterContent:', e); return {}; }
 }
 
-// ── GYM PROGRAM (template per quarter) ──
+// ── GYM PROGRAM (template per quarter — public read) ──
 export async function loadGymProgram(quarterId){
-  const { data } = await supa.from('gym_program')
-    .select('block,exercise,target_sets,target_reps,target_rpe,notes,sort_order')
-    .eq('quarter_id', quarterId)
-    .order('sort_order');
-  return data || [];
+  try {
+    const data = await restFetch('gym_program',
+      `select=block,exercise,target_sets,target_reps,target_rpe,notes,sort_order&quarter_id=eq.${quarterId}&order=sort_order.asc`);
+    return data || [];
+  } catch(e){ console.error('loadGymProgram:', e); return []; }
 }
 
 // ── GYM SESSIONS ──
@@ -165,16 +187,13 @@ export async function deleteCardioEntry(id){
   await supa.from('cardio_log').delete().eq('id', id);
 }
 
-// ── EXERCISE LIBRARY (Phase 1: read-only reference) ──
+// ── EXERCISE LIBRARY (public read, restFetch bypass) ──
 let _exerciseLibrary = null;
 let _exerciseLibraryLoaded = false;
 export async function loadExerciseLibrary(){
   if(_exerciseLibraryLoaded && _exerciseLibrary?.length) return _exerciseLibrary;
-  const { data, error } = await supa.from('exercise_library')
-    .select('*')
-    .order('category', { ascending: true })
-    .order('name', { ascending: true });
-  if(error){ console.error('loadExerciseLibrary:', error); throw error; }
+  const data = await restFetch('exercise_library',
+    'select=*&order=category.asc,name.asc');
   _exerciseLibrary = data || [];
   _exerciseLibraryLoaded = true;
   return _exerciseLibrary;
