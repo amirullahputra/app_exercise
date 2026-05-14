@@ -18,7 +18,7 @@ window.addEventListener('unhandledrejection', e => {
   </div>`;
 });
 
-import { S, weekFromDate } from './state.js?v=30';
+import { S, weekFromDate } from './state.js?v=31';
 window.S = S;  // debug: inspect state from console
 import {
   supa, loadQuarters, loadQuarterContent, loadGymProgram, loadGymSessions, loadGymSetsForQuarter,
@@ -31,10 +31,10 @@ import {
   getStravaConnection, triggerStravaSync as apiTriggerStravaSync,
   setupAuthListener, updateAuthUI, onAuthBtnClick, doLogin,
   closeAuthModal
-} from './supabase.js?v=30';
+} from './supabase.js?v=31';
 import {
   pOverview, pBuilder, pPlan, pLog, pLibrary
-} from './panels.js?v=30';
+} from './panels.js?v=31';
 
 // TAB definitions: 0=Overview, 1=Builder, 2=Plan, 3=Log, 4=Library
 const TABS = [
@@ -146,28 +146,13 @@ window.render = render;
 window.renderPanels = renderPanel;
 
 // ── QUARTER SYNERGY BRIDGE ──
-// App now uses period_id (individual quarters) directly.
-// semFromQ kept for backward compat with shared localStorage key.
-const QUARTER_TO_SEMESTER = {
-  'Q1_2026':'Q1Q2_2026','Q2_2026':'Q1Q2_2026',
-  'Q3_2026':'Q3Q4_2026','Q4_2026':'Q3Q4_2026',
-  'Q1_2027':'Q1Q2_2027','Q2_2027':'Q1Q2_2027',
-};
-function semFromQ(q){
-  // If another app sends period_id, keep as-is (now same format)
-  // If it sends a semester_id (Q3Q4_2026), extract first period
-  if(q && q.match(/^Q\d_\d{4}$/)) return q;  // already period_id
-  const sem2q = { 'Q1Q2_2026':'Q2_2026','Q3Q4_2026':'Q3_2026','Q1Q2_2027':'Q1_2027','Q3Q4_2027':'Q3_2027' };
-  return sem2q[q] || q;
-}
-function firstQOfSem(sem){ return sem; }
-window.VHM_QUARTER_BRIDGE = { semFromQ, firstQOfSem };
+function semFromQ(q){ return q; }
+window.VHM_QUARTER_BRIDGE = { semFromQ };
 
 // ── ACTIONS ──
 async function setQuarter(qid){
   S.quarterId = qid;
   try {
-    localStorage.setItem('vhm.activeSemester', QUARTER_TO_SEMESTER[qid] || qid);
     localStorage.setItem('vhm.activeQuarter', qid);
   } catch(e){}
   render();  // immediate visual feedback (gak nunggu DB async)
@@ -689,14 +674,6 @@ function showInitError(msg){
 }
 
 // ── INIT ──
-// Cleanup stale legacy localStorage values (semester format dari versi sebelumnya)
-try {
-  const legacy = localStorage.getItem('vhm.activeQuarter');
-  if(legacy && /^Q\dQ\d_/.test(legacy)){
-    localStorage.removeItem('vhm.activeQuarter');
-    localStorage.removeItem('vhm.activeSemester');
-  }
-} catch(_){}
 
 // Register auth listener PALING AWAL — biar Supabase event saat localStorage session
 // restored ke-catch + UI ga tampil "Login" sebentar saat reload page.

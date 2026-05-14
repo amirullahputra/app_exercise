@@ -145,12 +145,10 @@ export async function loadQuarters(){
 }
 
 // ── QUARTER CONTENT (markdown dari master_timeline.content_*_md) ──
-// quarterId bisa semester_id (Q3Q4_2026) atau period_id (Q3_2026); content
-// duplicate antara 2 row dalam 1 semester, jadi LIMIT 1 cukup.
 export async function loadQuarterContent(quarterId, docTypes=['GYM','CARDIO']){
   try {
     const rows = await restFetch('master_timeline',
-      `select=content_target_md,content_peptide_md,content_gym_md,content_cardio_md,content_nutrisi_md,content_vitamin_md&or=(semester_id.eq.${quarterId},period_id.eq.${quarterId})&limit=1`);
+      `select=content_target_md,content_peptide_md,content_gym_md,content_cardio_md,content_nutrisi_md,content_vitamin_md&period_id=eq.${quarterId}&limit=1`);
     const data = (rows||[])[0];
     if(!data) return {};
     const result = {};
