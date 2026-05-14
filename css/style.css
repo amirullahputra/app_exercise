@@ -19,7 +19,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--t0);font-family:'Inter',system-ui,sans-serif;font-size:13px;line-height:1.5;min-height:100vh}
+body{background:var(--bg);color:var(--t0);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
 .mono{font-family:'JetBrains Mono',monospace}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg2)}
@@ -55,12 +55,12 @@ body{background:var(--bg);color:var(--t0);font-family:'Inter',system-ui,sans-ser
 .ph-card.sel-all{border-color:var(--acc);background:var(--acc-bg);box-shadow:0 0 0 3px rgba(0,109,50,.12),var(--shadow)}
 .ph-tag{font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px}
 .ph-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.ph-name{font-size:14px;font-weight:800;color:var(--t0);margin-bottom:2px}
+.ph-name{font-size:16px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--t0);margin-bottom:4px;letter-spacing:-.2px}
 .ph-desc{font-size:11px;color:var(--t2);margin-bottom:10px}
 .ph-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .ph-stat{background:rgba(255,255,255,.6);border-radius:var(--r);padding:.5rem;border:1px solid rgba(0,0,0,.04)}
 .ph-stat-l{font-size:9px;color:var(--t2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-.ph-stat-v{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--t0)}
+.ph-stat-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--t0)}
 .ph-bar{height:4px;border-radius:2px;background:var(--bg3);margin-top:10px;overflow:hidden}
 .ph-bar-fill{height:100%;border-radius:2px}
 
@@ -389,11 +389,13 @@ input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;height:4px}
   .cmp-grid{grid-template-columns:1fr}
   .gantt-grid{min-width:600px}
   .srch{width:140px}
-  .phase-row{grid-template-columns:1fr}
+  .phase-row{display:flex;overflow-x:auto;gap:10px;padding-bottom:6px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+  .ph-card{flex:0 0 220px;scroll-snap-align:start}
   .vial-summary-strip{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:480px){
   .app{padding:.75rem .75rem 7rem}
+  .ph-card{flex:0 0 190px}
   .topbar{padding:.5rem .75rem;margin:-.75rem -.75rem .75rem}
   .topbar-badges{display:none}
   .topbar-ico{width:32px;height:32px;font-size:14px}
